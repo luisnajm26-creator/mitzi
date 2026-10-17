@@ -17,34 +17,35 @@ Qué cambió: la hoja ya no se vuelve a pintar en cada cuadro; solo se mueven ca
 | 3 | Toca el borde derecho para pasar página | El giro arranca enseguida, sin pausa |
 | 4 | Pasa al siguiente capítulo | El primer giro del capítulo puede tardar un poco más; los siguientes, fluidos |
 | 5 | Pasa una página hacia atrás | La hoja vuelve desde la izquierda, igual de fluida |
-| 6 | MatePad en horizontal (libro abierto) | El giro de la hoja, fluido; la sombra del lomo igual que en la PC |
-| 7 | Deja el libro quieto un rato y vuelve a pasar página | Igual de fluido (la pantalla vuelve a 120 Hz al tocarla) |
+| 6 | Pasa páginas hacia adelante y hacia atrás, en la PC y en el teléfono | La página que se queda quieta no cambia hasta que la hoja termina de taparla: el texto nuevo nunca aparece antes de tiempo |
+| 7 | MatePad en horizontal (libro abierto) | El giro de la hoja, fluido; la sombra del lomo igual que en la PC |
+| 8 | Deja el libro quieto un rato y vuelve a pasar página | Igual de fluido (la pantalla vuelve a 120 Hz al tocarla) |
 
 ## Explorador
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 8 | Abre la lupa y busca los libros que antes salían sin portada (Re:Zero-01 a 05, LN Vol 12 a 15) | Ahora tienen su portada. Al abrir la app, Mitzi las busca en la primera página del libro (puede tardar unos segundos la primera vez) |
-| 9 | Si algún libro sigue sin portada | Se ve una portada dibujada con sus colores, título y autor; nada se encima ni se desborda |
-| 10 | Mira los nombres de autor largos | Se cortan con «…» dentro de su ficha |
-| 11 | Toca **Agrupar**, **Ordenar** o **Formato** | Sube una hoja desde abajo con opciones grandes y una ✓ en la elegida (ya no el menú gris de Android) |
-| 12 | Desliza la fila de filtros a los lados | Se desplaza si no cabe en la pantalla |
+| 9 | Abre la lupa y busca los libros que antes salían sin portada (Re:Zero-01 a 05, LN Vol 12 a 15) | Ahora tienen su portada. Al abrir la app, Mitzi las busca en la primera página del libro (puede tardar unos segundos la primera vez) |
+| 10 | Si algún libro sigue sin portada | Se ve una portada dibujada con sus colores, título y autor; nada se encima ni se desborda |
+| 11 | Mira los nombres de autor largos | Se cortan con «…» dentro de su ficha |
+| 12 | Toca **Agrupar**, **Ordenar** o **Formato** | Sube una hoja desde abajo con opciones grandes y una ✓ en la elegida (ya no el menú gris de Android) |
+| 13 | Desliza la fila de filtros a los lados | Se desplaza si no cabe en la pantalla |
 
 ## Gesto atrás
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 13 | Abre el explorador y haz el gesto atrás | Se cierra el explorador; sigues en la biblioteca |
-| 14 | Abre un menú de **Ordenar** y haz el gesto atrás | Se cierra solo el menú |
-| 15 | Abre el panel de carpetas y haz el gesto atrás | Se cierra el panel |
-| 16 | En la biblioteca, sin nada abierto, haz el gesto atrás | Sale de la app (como antes) |
+| 14 | Abre el explorador y haz el gesto atrás | Se cierra el explorador; sigues en la biblioteca |
+| 15 | Abre un menú de **Ordenar** y haz el gesto atrás | Se cierra solo el menú |
+| 16 | Abre el panel de carpetas y haz el gesto atrás | Se cierra el panel |
+| 17 | En la biblioteca, sin nada abierto, haz el gesto atrás | Sale de la app (como antes) |
 
 ## Pantalla de inicio
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 17 | Cierra Mitzi por completo y ábrela | Ya no aparece el logo viejo: fondo oscuro, luego «Mitzi» aparece letra por letra con un brillo y una línea de carga |
-| 18 | Espera | La pantalla se desvanece cuando el libro del centro ya está dibujado; no se ve nada a medio cargar |
-| 19 | Mira la biblioteca justo después | Fluida desde el inicio; la revisión de carpetas empieza después de la pantalla de inicio |
-| 20 | Abre un libro unos segundos después de iniciar | Se abre rápido (el lector ya quedó cargado en segundo plano) |
-| 21 | Abre Mitzi en la PC | La misma pantalla de inicio |
+| 18 | Cierra Mitzi por completo y ábrela | Ya no aparece el logo viejo: fondo oscuro, luego «Mitzi» aparece letra por letra con un brillo y una línea de carga |
+| 19 | Espera | La pantalla se desvanece cuando el libro del centro ya está dibujado; no se ve nada a medio cargar |
+| 20 | Mira la biblioteca justo después | Fluida desde el inicio; la revisión de carpetas empieza después de la pantalla de inicio |
+| 21 | Abre un libro unos segundos después de iniciar | Se abre rápido (el lector ya quedó cargado en segundo plano) |
+| 22 | Abre Mitzi en la PC | La misma pantalla de inicio |

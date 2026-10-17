@@ -75,7 +75,13 @@ function sheet(parent: HTMLElement): Sheet {
 function place(sh: Sheet, r: DOMRect) {
   setRect(sh.box, r)
   Object.assign(sh.content.style, { width: `${r.width}px`, height: `${r.height}px` })
+  // el recorte es un cuadrado que cubre la página entera aunque gire alrededor de cualquier
+  // punto de ella; sin tamaño, la copia quieta (la que no gira) quedaba invisible
+  const cut = `${cutSize(r.width, r.height)}px`
+  Object.assign(sh.clip.style, { width: cut, height: cut })
 }
+
+const cutSize = (w: number, h: number) => 3 * Math.hypot(w, h)
 
 /** Inversa de una rotación con traslación. */
 const invertRigid = (m: Mat): Mat => ({ a: m.a, b: m.c, c: m.b, d: m.d, e: -(m.a * m.e + m.b * m.f), f: -(m.c * m.e + m.d * m.f) })
@@ -336,11 +342,11 @@ export class PageFlip {
       backFromLocal: book ? MIRROR : IDENTITY,
       restB,
       restC: book ? otherRect : turningRect,
-      cut: 3 * diag,
+      cut: cutSize(w, h),
       diag: diag + 4,
     }
     // tamaños fijos durante el giro: luego solo cambian transformaciones y opacidades
-    for (const clip of [B.clip, C.clip, this.#castClip]) Object.assign(clip.style, { width: `${3 * diag}px`, height: `${3 * diag}px` })
+    Object.assign(this.#castClip.style, { width: `${cutSize(w, h)}px`, height: `${cutSize(w, h)}px` })
     setRect(this.#castBox, restB)
     Object.assign(this.#castBar.style, { width: `${16 + w * 0.4}px`, height: `${diag + 4}px` })
     Object.assign(this.#shadeBar.style, { width: `${w}px`, height: `${diag + 4}px` })
