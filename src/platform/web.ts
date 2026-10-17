@@ -30,13 +30,13 @@ export function createWebPlatform(): Platform {
     removeFolder: async () => {},
     revealFolder: async () => {},
     async scan() {
-      if (!dev) return []
-      return (await fetchListing()).books
+      if (!dev) return { files: [], complete: true }
+      return { files: (await fetchListing()).books, complete: true }
     },
-    async readFile(path) {
+    async readBlob(path) {
       const res = await fetch(`/__mitzi/book?path=${encodeURIComponent(path)}`)
       if (!res.ok) throw new Error(`No se pudo leer ${path}`)
-      return res.arrayBuffer()
+      return res.blob()
     },
     onLibraryChanged(cb) {
       const hot = import.meta.hot

@@ -394,11 +394,13 @@ export class PageFlip {
     this.#cast.style.clipPath = toCssPolygon(fold.foldedPart.map(toScr))
     this.#cast.style.visibility = ''
     bar(this.#castBar, n.x, n.y, 16 + s.w * 0.4 * lift)
-    this.#castBar.style.opacity = String(0.25 + 0.75 * lift)
+    // las sombras y el brillo entran y salen suaves: nada se enciende o apaga de golpe
+    this.#castBar.style.opacity = String(lift)
     // sobre la hoja doblada: brillo y sombra de la curvatura del papel
     this.#shade.style.clipPath = toCssPolygon(fold.flap.map(toScr))
     this.#shade.style.visibility = ''
     bar(this.#shadeBar, -n.x, -n.y, s.w)
+    this.#shadeBar.style.opacity = String(Math.min(1, lift * 1.8))
     this.#shade.dataset.dark = String(s.dark)
   }
 }

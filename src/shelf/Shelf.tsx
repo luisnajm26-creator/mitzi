@@ -4,7 +4,7 @@ import { platform, isTouchDevice } from '../platform'
 import type { LibraryFolders } from '../platform/types'
 import { useLibrary } from '../library/store'
 import { db } from '../library/db'
-import { syncLibrary } from '../library/scanner'
+import { retryFailed, syncLibrary } from '../library/scanner'
 import { carouselBooks, useLibraryQuery, type CarouselFilter } from '../library/query'
 import { Explorer } from './Explorer'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
@@ -25,6 +25,8 @@ export function Shelf({ active }: { active: boolean }) {
   const progress = useLibrary(s => s.progress)
   const loaded = useLibrary(s => s.loaded)
   const scanning = useLibrary(s => s.scanning)
+  const failed = useLibrary(s => s.failed)
+  const [failedOpen, setFailedOpen] = useState(false)
   const openBook = useApp(s => s.openBook)
   const motion = useMemo(createMotion, [])
   const [center, setCenter] = useState(0)
@@ -219,6 +221,12 @@ export function Shelf({ active }: { active: boolean }) {
           Leyendo libros… {scanning.done} / {scanning.total}
         </div>
       )}
+      {!scanning && failed.length > 0 && (
+        <button className="scan-toast warn" onClick={() => setFailedOpen(true)}>
+          {failed.length === 1 ? '1 libro no se pudo leer' : `${failed.length} libros no se pudieron leer`}
+        </button>
+      )}
+      {failedOpen && <FailedPanel onClose={() => setFailedOpen(false)} />}
       {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}
       {explorerOpen && <Explorer onClose={() => setExplorerOpen(false)} onPick={pickBook} onShowGroup={showGroup} />}
       <div
@@ -293,6 +301,45 @@ function EmptyState({ onFolders }: { onFolders(): void }) {
         )}
       </div>
       {platform.kind === 'electron' && <p className="hint">También puedes arrastrar libros a esta ventana.</p>}
+    </div>
+  )
+}
+
+/** Qué libros fallaron y por qué: para reportarlo o reintentar. */
+function FailedPanel({ onClose }: { onClose(): void }) {
+  const failed = useLibrary(s => s.failed)
+  const engine = navigator.userAgent.match(/Chrome\/(\d+)/)?.[1]
+  return (
+    <div className="sheet-backdrop" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()} role="dialog" aria-label="Libros que no se pudieron leer">
+        <header className="sheet-header">
+          <h2>Libros que no se pudieron leer</h2>
+          <button className="icon-button" onClick={onClose} aria-label="Cerrar">
+            <Icon name="close" />
+          </button>
+        </header>
+        <p className="sheet-note">
+          Mitzi siguió con los demás. Si vuelve a pasar, manda una captura de esta lista
+          {engine ? ` (navegador interno: Chrome ${engine})` : ''}.
+        </p>
+        <ul className="folder-list failed-list">
+          {failed.map((f, i) => (
+            <li key={i}>
+              <strong>{f.name}</strong>
+              <small>{f.reason}</small>
+            </li>
+          ))}
+        </ul>
+        <button
+          className="read-button"
+          onClick={() => {
+            onClose()
+            retryFailed()
+          }}
+        >
+          Reintentar
+        </button>
+      </div>
     </div>
   )
 }

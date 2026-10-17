@@ -9,10 +9,10 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     addFolder: () => api.addFolder(),
     removeFolder: folder => api.removeFolder(folder),
     revealFolder: folder => api.revealFolder(folder),
-    scan: () => api.scan(),
-    async readFile(path) {
+    scan: async () => ({ files: await api.scan(), complete: true }),
+    async readBlob(path) {
       const bytes = await api.readBook(path)
-      return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+      return new Blob([bytes as Uint8Array<ArrayBuffer>])
     },
     onLibraryChanged: cb => api.onLibraryChanged(cb),
     importDropped(files) {

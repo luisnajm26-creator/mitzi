@@ -104,7 +104,6 @@
   border: 0;
   background: transparent;
   pointer-events: none;
-  color-scheme: normal;
 }
 
 .flip-shadow {
@@ -130,7 +129,7 @@
     to bottom,
     rgba(0, 0, 0, 0.26) 0%,
     rgba(0, 0, 0, 0.06) 4%,
-    rgba(255, 255, 255, 0.2) 9%,
+    rgba(255, 255, 255, 0.12) 9%,
     rgba(255, 255, 255, 0) 24%,
     rgba(0, 0, 0, 0) 72%,
     rgba(0, 0, 0, 0.08) 100%
@@ -255,8 +254,9 @@
   align-items: center;
   gap: 14px;
   padding: 10px max(14px, var(--sa-right)) 10px max(14px, var(--sa-left));
-  background: color-mix(in srgb, var(--r-surface) 88%, transparent);
-  backdrop-filter: blur(14px);
+  /* sin backdrop-filter: sobre el libro (iframes) Chromium puede pintar un cuadro negro al aparecer */
+  background: color-mix(in srgb, var(--r-surface) 97%, transparent);
+  will-change: transform, opacity;
   transition:
     transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
     opacity 220ms ease;

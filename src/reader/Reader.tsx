@@ -251,11 +251,11 @@ export default function Reader({ bookId }: { bookId: string }) {
         const record = await db.books.get(bookId)
         if (!record) throw new Error('Libro no encontrado')
         setBook(record)
-        const [buffer, progress] = await Promise.all([platform.readFile(record.path), db.progress.get(bookId)])
+        const [blob, progress] = await Promise.all([platform.readBlob(record.path), db.progress.get(bookId)])
         if (cancelled || !stageRef.current) return
         engine = record.format === 'epub' ? new EpubEngine(callbacks) : new PdfEngine(callbacks)
         engineRef.current = engine
-        await engine.open(stageRef.current, new File([buffer], record.fileName), {
+        await engine.open(stageRef.current, new File([blob], record.fileName), {
           location: progress?.location,
           settings: latest.current.settings,
           theme: latest.current.theme,

@@ -6,7 +6,7 @@ interface MitziLibraryPlugin {
   getFolders(): Promise<{ folders: string[] }>
   pickFolder(): Promise<{ added: boolean }>
   removeFolder(options: { uri: string }): Promise<void>
-  scan(): Promise<{ files: BookFile[] }>
+  scan(): Promise<{ files: BookFile[]; failed?: string[] }>
   readFile(options: { path: string }): Promise<{ path: string }>
   setKeepAwake(options: { on: boolean }): Promise<void>
   setHighRefresh(options: { on: boolean }): Promise<void>
@@ -49,14 +49,15 @@ export function createAndroidPlatform(): Platform {
     revealFolder: async () => {},
     folderLabel,
     async scan() {
-      const { files } = await Library.scan()
-      return files
+      const { files, failed } = await Library.scan()
+      return { files, complete: !failed?.length }
     },
-    async readFile(path) {
+    async readBlob(path) {
+      // el plugin copia el libro a la caché de la app; se pide como Blob para no cargarlo en memoria
       const { path: local } = await Library.readFile({ path })
       const res = await fetch(Capacitor.convertFileSrc(local))
       if (!res.ok) throw new Error(`No se pudo leer ${path}`)
-      return res.arrayBuffer()
+      return res.blob()
     },
     onLibraryChanged(cb) {
       const off = listen(() => Library.addListener('libraryChanged', cb))

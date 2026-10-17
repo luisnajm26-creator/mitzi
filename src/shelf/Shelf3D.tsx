@@ -2,7 +2,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import * as THREE from 'three'
 import type { BookRecord } from '../library/db'
-import { platform } from '../platform'
+import { isTouchDevice, platform } from '../platform'
 import { ambientColors } from '../library/palette'
 import { CarouselController } from './carousel'
 import { LightRig } from './LightRig'
@@ -17,7 +17,7 @@ export const OPEN_MS = 1300
 /** Al volver del lector, la misma animación al revés: el libro se cierra y vuelve al estante. */
 export const CLOSE_MS = 1150
 /** Libros que se montan a cada lado del central. */
-const WINDOW = 6
+const WINDOW = isTouchDevice ? 4 : 6
 
 export interface ShelfMotion {
   ctrl: CarouselController

@@ -1,10 +1,13 @@
 import * as THREE from 'three'
 import { clamp, isDark, mix } from '../lib/color'
 import { db, type BookRecord } from '../library/db'
+import { isTouchDevice } from '../platform'
 import { loadImage } from '../library/metadata'
 
 export const BOOK_HEIGHT = 2.1
-const MAX_COVER_PX = 1024
+// en teléfonos el dibujo va a 2× como máximo: texturas más chicas ahorran memoria sin perder nitidez
+const MAX_COVER_PX = isTouchDevice ? 640 : 1024
+const CANVAS_W = isTouchDevice ? 448 : 640
 const TITLE_FONT = '"Literata Variable", Georgia, serif'
 const UI_FONT = '"Nunito Variable", system-ui, sans-serif'
 
@@ -97,9 +100,12 @@ function ellipsize(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 
 /** Portada generada para libros sin imagen de portada. */
 function generatedCover(book: BookRecord, aspect: number) {
+  // se dibuja con medidas de 640 px y se escala al tamaño real del lienzo
   const w = 640
   const h = Math.round(w / aspect)
-  const [canvas, ctx] = makeCanvas(w, h)
+  const k = CANVAS_W / w
+  const [canvas, ctx] = makeCanvas(Math.round(w * k), Math.round(h * k))
+  ctx.scale(k, k)
   const { primary, secondary, dark } = book.palette
   const grad = ctx.createLinearGradient(0, 0, w, h)
   grad.addColorStop(0, primary)
@@ -174,9 +180,12 @@ function canvasTexture(canvas: HTMLCanvasElement, anisotropy: number) {
 
 /** Primera página (portadilla): papel crema con el título, como la de un libro impreso. */
 function firstPageCanvas(book: BookRecord, aspect: number) {
+  // se dibuja con medidas de 640 px y se escala al tamaño real del lienzo
   const w = 640
   const h = Math.round(w / aspect)
-  const [canvas, ctx] = makeCanvas(w, h)
+  const k = CANVAS_W / w
+  const [canvas, ctx] = makeCanvas(Math.round(w * k), Math.round(h * k))
+  ctx.scale(k, k)
   ctx.fillStyle = '#f6f1e6'
   ctx.fillRect(0, 0, w, h)
   // sombra suave cerca del lomo
@@ -263,12 +272,16 @@ export function createBookModel(book: BookRecord, dims: BookDims, anisotropy: nu
   const side = new THREE.MeshStandardMaterial({ map: edgeSide, roughness: 0.95 })
   const top = new THREE.MeshStandardMaterial({ map: edgeTop, roughness: 0.95 })
 
-  const blockW = w - t - 0.018
+  // ninguna cara de una pieza queda en el mismo plano que la de otra: así no "parpadean" (z-fighting)
+  const gap = 0.004
+  const spineW = t + 0.006
+  const blockW = w - t - 0.018 - gap
   const blockH = h - 0.05
-  const blockD = Math.max(0.01, d - 2 * t)
+  const blockD = Math.max(0.01, d - 2 * t - gap)
   const geometries = [
     new THREE.BoxGeometry(w, h, t),
-    new THREE.BoxGeometry(t, h, d),
+    // el lomo sobresale un poco por fuera, arriba, abajo y por delante de las tapas
+    new THREE.BoxGeometry(spineW, h + 0.008, d + 0.01),
     new THREE.BoxGeometry(w, h, t),
     new THREE.BoxGeometry(blockW, blockH, blockD),
   ]
@@ -303,12 +316,12 @@ export function createBookModel(book: BookRecord, dims: BookDims, anisotropy: nu
   return {
     pivot: [-w / 2, 0, d / 2 - t / 2],
     cover: { geometry: geometries[0], materials: [board, board, board, board, coverMat, endpaper], position: [w / 2, 0, 0] },
-    spine: { geometry: geometries[1], materials: [board, spineMat, board, board, board, board], position: [-w / 2 + t / 2, 0, 0] },
+    spine: { geometry: geometries[1], materials: [board, spineMat, board, board, board, board], position: [-w / 2 - 0.006 + spineW / 2, 0, 0] },
     back: { geometry: geometries[2], materials: [board, board, board, board, endpaper, board], position: [0, 0, -d / 2 + t / 2] },
     block: {
       geometry: geometries[3],
       materials: [side, paper, top, top, page, paper],
-      position: [-w / 2 + t + blockW / 2, 0, 0],
+      position: [-w / 2 + t + gap + blockW / 2, 0, 0],
     },
     ready,
     dispose() {

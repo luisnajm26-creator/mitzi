@@ -251,6 +251,32 @@
   animation: fade-in 200ms ease both;
 }
 
+.scan-toast.warn {
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-color: rgba(255, 190, 120, 0.45);
+}
+
+.failed-list li {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.failed-list strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.failed-list small {
+  font-size: 12px;
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}
+
 .empty-state {
   position: absolute;
   inset: 0;

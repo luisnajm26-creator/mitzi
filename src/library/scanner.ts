@@ -1,14 +1,20 @@
+import { sha256 } from '@noble/hashes/sha2.js'
 import { platform } from '../platform'
-import type { BookFile } from '../platform/types'
+import type { BookFile, ScanResult } from '../platform/types'
 import { db, type BookRecord } from './db'
 import { extractBook, formatOf } from './metadata'
 import { seriesKeyOf } from './series'
 import { refreshLibrary, useLibrary } from './store'
 
 const ERROR_ID = '!error'
+/** Un libro que tarda más que esto se deja para después (no traba el resto). */
+const FILE_TIMEOUT = 90_000
+const HASH_CHUNK = 4 * 1024 * 1024
 
 let running: Promise<void> | null = null
 let again = false
+/** Los libros que fallaron se reintentan una vez por cada vez que se abre la app. */
+let retriedErrors = false
 
 /**
  * Compara las carpetas con lo que ya conocemos: lee solo los archivos nuevos o
@@ -32,71 +38,116 @@ export function syncLibrary(): Promise<void> {
   return running
 }
 
-async function sha256(buffer: ArrayBuffer) {
-  const digest = await crypto.subtle.digest('SHA-256', buffer)
-  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
+/** Vuelve a intentar los libros que no se pudieron leer. */
+export function retryFailed() {
+  retriedErrors = false
+  return syncLibrary()
+}
+
+const pause = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms))
+const toHex = (bytes: Uint8Array) => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('')
+
+/**
+ * SHA-256 del archivo: es el id del libro en cualquier dispositivo. En el teléfono
+ * se calcula por bloques de 4 MB para no tener el libro entero en memoria.
+ */
+async function hashBlob(blob: Blob) {
+  if (platform.kind !== 'android' && blob.size < 64 * 1024 * 1024)
+    return toHex(new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())))
+  const h = sha256.create()
+  for (let offset = 0; offset < blob.size; offset += HASH_CHUNK) {
+    h.update(new Uint8Array(await blob.slice(offset, offset + HASH_CHUNK).arrayBuffer()))
+    await pause() // deja respirar a la interfaz entre bloques
+  }
+  return toHex(h.digest())
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, what: string) {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`Tardó demasiado: ${what}`)), ms)),
+  ])
 }
 
 async function syncOnce() {
-  let files: BookFile[]
+  let scan: ScanResult
   try {
-    files = await platform.scan()
+    scan = await platform.scan()
   } catch (e) {
     console.warn('No se pudieron recorrer las carpetas', e)
     return
   }
+  const { files, complete } = scan
   const currentPaths = new Set(files.map(f => f.path))
   const index = new Map((await db.files.toArray()).map(f => [f.path, f]))
 
-  const stale = [...index.keys()].filter(p => !currentPaths.has(p))
-  if (stale.length) await db.files.bulkDelete(stale)
+  // si alguna carpeta no se pudo leer, no se borra nada: sus libros no "desaparecen"
+  if (complete) {
+    const stale = [...index.keys()].filter(p => !currentPaths.has(p))
+    if (stale.length) await db.files.bulkDelete(stale)
+  }
 
   /** bookId → ruta donde está ahora */
   const present = new Map<string, string>()
   const todo: BookFile[] = []
+  const retry = !retriedErrors
+  retriedErrors = true
   for (const file of files) {
     const known = index.get(file.path)
-    if (known && known.size === file.size && known.mtime === file.mtime) {
-      if (known.bookId !== ERROR_ID) present.set(known.bookId, file.path)
-    } else if (formatOf(file.name)) todo.push(file)
+    const unchanged = known && known.size === file.size && known.mtime === file.mtime
+    if (unchanged && known.bookId !== ERROR_ID) present.set(known.bookId, file.path)
+    else if ((!unchanged || retry) && formatOf(file.name)) todo.push(file)
   }
 
   if (todo.length) useLibrary.setState({ scanning: { done: 0, total: todo.length } })
+  let lastRefresh = performance.now()
   for (const [i, file] of todo.entries()) {
     let bookId = ERROR_ID
+    let error: string | undefined
     try {
-      bookId = await importFile(file)
+      bookId = await withTimeout(importFile(file), FILE_TIMEOUT, file.name)
       present.set(bookId, file.path)
     } catch (e) {
       console.warn('No se pudo leer el libro', file.path, e)
+      error = e instanceof Error ? e.message || e.name : String(e)
     }
-    await db.files.put({ path: file.path, size: file.size, mtime: file.mtime, bookId })
+    await db.files.put({ path: file.path, size: file.size, mtime: file.mtime, bookId, ...(error ? { name: file.name, error } : {}) })
     useLibrary.setState({ scanning: { done: i + 1, total: todo.length } })
-    // los libros van apareciendo uno por uno mientras se leen
-    await refreshLibrary()
+    // los libros van apareciendo mientras se leen, sin redibujar la biblioteca a cada rato
+    if (performance.now() - lastRefresh > 1500) {
+      await refreshLibrary()
+      lastRefresh = performance.now()
+    }
+    await pause(30)
   }
 
-  await db.transaction('rw', db.books, async () => {
-    for (const book of await db.books.toArray()) {
-      const path = present.get(book.id)
-      if (!path && !book.missing) await db.books.update(book.id, { missing: true })
-      else if (path && (book.missing || book.path !== path)) await db.books.update(book.id, { missing: false, path })
-    }
-  })
+  if (complete) {
+    await db.transaction('rw', db.books, async () => {
+      for (const book of await db.books.toArray()) {
+        const path = present.get(book.id)
+        if (!path && !book.missing) await db.books.update(book.id, { missing: true })
+        else if (path && (book.missing || book.path !== path)) await db.books.update(book.id, { missing: false, path })
+      }
+    })
+  } else {
+    // escaneo parcial: solo se reactivan los que sí se encontraron
+    for (const [id, path] of present) await db.books.update(id, { missing: false, path })
+  }
   await refreshLibrary()
 }
 
 async function importFile(file: BookFile): Promise<string> {
   const format = formatOf(file.name)!
-  const buffer = await platform.readFile(file.path)
-  const id = await sha256(buffer)
+  // como archivo (Blob) y no como bloque de memoria: el libro puede pesar decenas de MB
+  const blob = await platform.readBlob(file.path)
+  const id = await hashBlob(blob)
   const existing = await db.books.get(id)
   if (existing) {
     if (existing.path !== file.path || existing.missing)
       await db.books.update(id, { path: file.path, fileName: file.name, missing: false })
     return id
   }
-  const { cover, ...meta } = await extractBook(new File([buffer], file.name), format)
+  const { cover, ...meta } = await extractBook(new File([blob], file.name), format)
   const record: BookRecord = {
     id,
     format,

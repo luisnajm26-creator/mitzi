@@ -38,6 +38,9 @@ export interface FileRecord {
   mtime: number
   /** id del libro, o '!error' si no se pudo leer */
   bookId: string
+  /** si no se pudo leer: nombre del archivo y el motivo, para mostrarlo */
+  name?: string
+  error?: string
 }
 
 export interface ProgressRecord {

@@ -142,13 +142,15 @@ public class MitziLibraryPlugin extends Plugin {
     public void scan(PluginCall call) {
         new Thread(() -> {
             JSArray out = new JSArray();
+            JSArray failed = new JSArray();
             ContentResolver resolver = getContext().getContentResolver();
             for (String folder : loadFolders()) {
                 try {
                     Uri tree = Uri.parse(folder);
                     walk(resolver, tree, DocumentsContract.getTreeDocumentId(tree), 0, out);
-                } catch (Exception ignored) {
-                    // carpeta borrada o sin permiso: se ignora
+                } catch (Exception e) {
+                    // carpeta borrada o sin permiso: se avisa para no dar sus libros por perdidos
+                    failed.put(folder);
                 }
             }
             File[] imported = importedDir(getContext()).listFiles();
@@ -165,6 +167,7 @@ public class MitziLibraryPlugin extends Plugin {
             }
             JSObject ret = new JSObject();
             ret.put("files", out);
+            ret.put("failed", failed);
             call.resolve(ret);
         })
             .start();
@@ -181,7 +184,8 @@ public class MitziLibraryPlugin extends Plugin {
             Document.COLUMN_LAST_MODIFIED
         };
         try (Cursor c = resolver.query(children, columns, null, null, null)) {
-            while (c != null && c.moveToNext()) {
+            if (c == null) throw new IllegalStateException("Sin acceso a la carpeta");
+            while (c.moveToNext()) {
                 String id = c.getString(0);
                 String name = c.getString(1);
                 String mime = c.getString(2);

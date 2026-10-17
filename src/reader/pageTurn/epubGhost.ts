@@ -62,6 +62,8 @@ export class GhostPages {
       g.key = key
       g.frame.style.width = `${fr.width}px`
       g.frame.style.height = `${fr.height}px`
+      // mismo esquema de color que el original: si no, Chromium pinta un fondo opaco (blanco) detrás
+      g.frame.style.colorScheme = getComputedStyle(source).colorScheme
       const gdoc = g.frame.contentDocument
       if (gdoc) {
         const html = gdoc.importNode(doc.documentElement, true)
