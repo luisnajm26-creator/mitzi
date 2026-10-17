@@ -1,0 +1,43 @@
+{
+  "name": "mitzi",
+  "productName": "Mitzi",
+  "version": "0.1.0",
+  "description": "Lector de EPUB y PDF de código abierto, con biblioteca 3D estilo selector de videojuegos.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "postinstall": "node scripts/copy-pdfjs-assets.mjs && node node_modules/electron/install.js",
+    "dev": "vite",
+    "electron:dev": "node scripts/dev-electron.mjs",
+    "build": "tsc -b && vite build && tsc -p electron/tsconfig.json",
+    "typecheck": "tsc -b && tsc -p electron/tsconfig.json --noEmit",
+    "electron": "electron .",
+    "demo": "node scripts/generar-libros-demo.mjs"
+  },
+  "dependencies": {
+    "@fontsource-variable/atkinson-hyperlegible-next": "^5.3.0",
+    "@fontsource-variable/literata": "^5.3.0",
+    "@fontsource-variable/merriweather": "^5.3.0",
+    "@fontsource-variable/nunito": "^5.3.0",
+    "@fontsource/opendyslexic": "^5.3.0",
+    "@react-three/fiber": "^9.8.2",
+    "dexie": "^4.4.6",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.186.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^44.8.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}

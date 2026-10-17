@@ -1,0 +1,41 @@
+# Dependencias y builds
+node_modules/
+dist/
+dist-electron/
+release/
+*.tsbuildinfo
+
+# Recursos de pdf.js copiados al instalar (scripts/copy-pdfjs-assets.mjs)
+public/pdfjs/
+
+# Libros: Mitzi no distribuye libros, cada quien agrega los suyos
+libros-prueba/*
+!libros-prueba/LEEME.md
+*.epub
+*.pdf
+*.mobi
+*.azw3
+*.fb2
+*.cbz
+
+# Configuración local de herramientas
+.env
+.env.*
+!.env.example
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Android (Capacitor)
+android/app/build/
+android/.gradle/
+android/local.properties
+*.keystore
+*.jks
+
+# Configuración local de herramientas
+.claude/

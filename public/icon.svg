@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6d8" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#fff6d8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="book" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c9b6ff"/>
+      <stop offset="1" stop-color="#ff9fc4"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#15111f"/>
+  <path d="M28 6h8l14 46H14z" fill="url(#beam)" opacity=".55"/>
+  <rect x="22" y="22" width="20" height="28" rx="2.5" fill="url(#book)"/>
+  <rect x="22" y="22" width="4" height="28" rx="1.5" fill="#7d63c9"/>
+  <ellipse cx="32" cy="54" rx="14" ry="2.6" fill="#000" opacity=".45"/>
+</svg>
