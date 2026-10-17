@@ -2,6 +2,7 @@ import { platform } from '../platform'
 import type { BookFile } from '../platform/types'
 import { db, type BookRecord } from './db'
 import { extractBook, formatOf } from './metadata'
+import { seriesKeyOf } from './series'
 import { refreshLibrary, useLibrary } from './store'
 
 const ERROR_ID = '!error'
@@ -95,7 +96,7 @@ async function importFile(file: BookFile): Promise<string> {
       await db.books.update(id, { path: file.path, fileName: file.name, missing: false })
     return id
   }
-  const meta = await extractBook(new File([buffer], file.name), format)
+  const { cover, ...meta } = await extractBook(new File([buffer], file.name), format)
   const record: BookRecord = {
     id,
     format,
@@ -104,7 +105,11 @@ async function importFile(file: BookFile): Promise<string> {
     size: file.size,
     addedAt: Date.now(),
     ...meta,
+    hasCover: !!cover,
+    seriesKey: meta.series ? seriesKeyOf(meta.series) : undefined,
   }
+  // la portada se guarda aparte: la lista de libros queda liviana aunque haya miles
+  if (cover) await db.covers.put({ id, blob: cover })
   await db.books.put(record)
   return id
 }

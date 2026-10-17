@@ -18,7 +18,7 @@ libros-prueba/*
 *.fb2
 *.cbz
 
-# Configuración local de herramientas
+# Configuración local y secretos
 .env
 .env.*
 !.env.example

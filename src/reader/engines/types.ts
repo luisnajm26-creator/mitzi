@@ -40,6 +40,11 @@ export interface EngineCallbacks {
   onSelect(selection: TextSelection | null): void
   /** Se tocó un subrayado existente. */
   onAnnotationTap(id: string, rect: DOMRect): void
+  /**
+   * Gestos sobre el texto. Devuelve true si Mitzi toma el gesto (arrastrar la hoja):
+   * entonces el motor no hace su propio desplazamiento ni selecciona texto.
+   */
+  onPointer(e: PointerInfo): boolean
 }
 
 /** Cómo se muestra el libro: en PC/tablet horizontal, como libro abierto de dos páginas. */
@@ -56,18 +61,15 @@ export interface OpenOptions {
   view: ViewOptions
 }
 
-/**
- * Una columna (página) visible, "fotografiada" para la animación de pasar página.
- * `mount` la dibuja dentro de un contenedor; el contenido se copia al crear la captura,
- * así que se puede montar aunque el libro ya haya avanzado.
- */
-export interface SnapColumn {
-  rect: DOMRect
-  mount(container: HTMLElement): Promise<void>
-}
+/** Qué página del libro abierto (o la única, en pantallas angostas). */
+export type PageSide = 'left' | 'right' | 'single'
 
-export interface Snapshot {
-  columns: SnapColumn[]
+/** Toque, clic o arrastre sobre el libro, en coordenadas de la ventana. */
+export interface PointerInfo {
+  type: 'down' | 'move' | 'up' | 'cancel'
+  x: number
+  y: number
+  pointerType: string
 }
 
 export interface SpeechSegment {
@@ -96,8 +98,15 @@ export interface ReaderEngine {
   position(): string | null
   /** Ancho / alto de una página, para dar forma al libro abierto. */
   pageAspect(): number
-  /** Captura lo visible, o null si este modo no admite la animación. */
-  snapshot(): Promise<Snapshot | null>
+  /** Si en el estado actual se puede animar el giro de página (no al leer deslizando). */
+  canFlip(): boolean
+  /**
+   * Dibuja dentro de `slot` una copia exacta de lo que se ve ahora en esa página
+   * (`pageRect` es la hoja completa en la ventana). Devuelve false si esa página está vacía.
+   */
+  paintPage(slot: HTMLElement, side: PageSide, pageRect: DOMRect): Promise<boolean>
+  /** Prepara las copias con tiempo, mientras se lee, para que el giro empiece al instante. */
+  prewarm(slots: HTMLElement[]): void
   /** Dibuja los subrayados del libro (se llama de nuevo cuando cambian). */
   setAnnotations(list: AnnotationRecord[], theme: ThemeColors): void
   clearSelection(): void

@@ -4,9 +4,11 @@ import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import { epubCss } from '../comfort/epubCss'
 import type { ComfortSettings } from '../comfort/settings'
-import { snapshotColumn, splitColumns } from '../pageTurn/epubSnapshot'
+import { GhostPages } from '../pageTurn/epubGhost'
 import { createEpubSpeech } from '../tts/epubSpeech'
-import type { EngineCallbacks, OpenOptions, ReaderEngine, Snapshot, TocEntry, ViewOptions } from './types'
+import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, TocEntry, ViewOptions } from './types'
+
+const idle = () => new Promise<void>(resolve => (window.requestIdleCallback ?? setTimeout)(() => resolve()))
 
 const flattenToc = (items: TocItem[] | null | undefined, depth = 0): TocEntry[] =>
   (items ?? []).flatMap(item => [
@@ -23,8 +25,12 @@ export class EpubEngine implements ReaderEngine {
   #view: View | null = null
   #callbacks: EngineCallbacks
   #lastCss = ''
-  #animateSwipes = true
   #theme: ThemeColors | null = null
+  /** La hoja de papel está activa: los gestos de arrastre son de Mitzi, no de foliate. */
+  #flipEnabled = true
+  #ghosts = new GhostPages()
+  #prewarming = false
+  #suppressClickAt = 0
   /** subrayados por CFI */
   #annotations = new Map<string, AnnotationRecord>()
   #annotationTapAt = 0
@@ -89,22 +95,23 @@ export class EpubEngine implements ReaderEngine {
           'max-column-count': s.spread === 'single' ? '1' : '2',
         }
     for (const [name, value] of Object.entries(attrs)) if (r.getAttribute(name) !== value) r.setAttribute(name, value)
-    this.#animateSwipes = s.animatePages
+    this.#flipEnabled = s.animatePages && (v.bookMode || s.flow === 'paginated')
     const css = epubCss(s, t)
     if (css !== this.#lastCss) {
       this.#lastCss = css
       r.setStyles(css)
+      this.#ghosts.invalidate()
     }
   }
 
-  // los cambios de página por botón o tecla los anima Mitzi (hoja que gira), no foliate
+  // el giro lo anima Mitzi (la hoja de papel): foliate cambia de página al instante
   next() {
-    this.#view?.renderer.removeAttribute('animated')
+    this.#view?.renderer.toggleAttribute('animated', !this.#flipEnabled)
     return this.#view?.next() ?? Promise.resolve()
   }
 
   prev() {
-    this.#view?.renderer.removeAttribute('animated')
+    this.#view?.renderer.toggleAttribute('animated', !this.#flipEnabled)
     return this.#view?.prev() ?? Promise.resolve()
   }
 
@@ -128,34 +135,57 @@ export class EpubEngine implements ReaderEngine {
     return BOOK_PAGE_ASPECT
   }
 
-  async snapshot(): Promise<Snapshot | null> {
+  canFlip() {
+    const r = this.#view?.renderer
+    const doc = r?.getContents()[0]?.doc
+    if (!r || !doc || !this.#flipEnabled || r.getAttribute('flow') === 'scrolled') return false
+    // textos verticales o de derecha a izquierda: sin hoja por ahora
+    const body = doc.defaultView?.getComputedStyle(doc.body)
+    return !!body && body.direction !== 'rtl' && !body.writingMode.startsWith('vertical')
+  }
+
+  async paintPage(slot: HTMLElement, side: PageSide, pageRect: DOMRect) {
     const view = this.#view
     const r = view?.renderer
     const content = r?.getContents()[0]
-    const visible = view?.lastLocation?.range
-    if (!view || !r || !content?.doc || !visible || r.getAttribute('flow') === 'scrolled') return null
+    const frame = content?.doc.defaultView?.frameElement
+    if (!view || !r || !content || !frame) return false
     const doc = content.doc
-    const win = doc.defaultView
-    const frame = win?.frameElement
-    if (!win || !frame) return null
-    const html = win.getComputedStyle(doc.documentElement)
-    const body = win.getComputedStyle(doc.body)
-    // textos verticales o de derecha a izquierda: sin animación por ahora
-    if (body.direction === 'rtl' || body.writingMode.startsWith('vertical')) return null
-
     const fr = frame.getBoundingClientRect()
     const size = r.size
     const x0 = r.start - size // ventana visible, en coordenadas del iframe
+    const html = doc.defaultView!.getComputedStyle(doc.documentElement)
     const colWidth = parseFloat(html.columnWidth) || size
     const gap = parseFloat(html.columnGap) || 0
     const count = Math.max(1, Math.min(2, Math.round(size / (colWidth + gap))))
-    const ranges = count === 2 ? splitColumns(doc, visible, x0 + size / 2) : [visible]
     const width = size / count
-    return {
-      columns: ranges.map((range, k) =>
-        snapshotColumn(doc, range, { rect: new DOMRect(fr.left + x0 + k * width, fr.top, width, fr.height), padX: gap / 2 }),
-      ),
-    }
+    const k = side === 'right' && count === 2 ? 1 : 0
+    const g = await this.#ghosts.ensure(slot, view, doc, content.index, [...this.#annotations.values()], this.#theme)
+    Object.assign(g.win.style, {
+      left: `${fr.left + x0 + k * width - pageRect.left}px`,
+      top: `${fr.top - pageRect.top}px`,
+      width: `${width}px`,
+      height: `${fr.height}px`,
+    })
+    g.frame.style.left = `${-(x0 + k * width)}px`
+    slot.style.background = this.#theme?.bg ?? ''
+    return true
+  }
+
+  prewarm(slots: HTMLElement[]) {
+    if (this.#prewarming || !this.#flipEnabled) return
+    this.#prewarming = true
+    ;(async () => {
+      for (const slot of slots) {
+        await idle()
+        const view = this.#view
+        const content = view?.renderer.getContents()[0]
+        if (!view || !content?.doc) break
+        await this.#ghosts.ensure(slot, view, content.doc, content.index, [...this.#annotations.values()], this.#theme)
+      }
+    })()
+      .catch(() => {})
+      .finally(() => (this.#prewarming = false))
   }
 
   speech(lang?: string) {
@@ -167,6 +197,7 @@ export class EpubEngine implements ReaderEngine {
     const next = new Map(list.filter(a => !a.deleted).map(a => [a.anchor, a]))
     for (const cfi of this.#annotations.keys()) if (!next.has(cfi)) this.#view?.deleteAnnotation({ value: cfi }).catch(() => {})
     this.#annotations = next
+    this.#ghosts.invalidate()
     this.#drawAll()
   }
 
@@ -227,14 +258,32 @@ export class EpubEngine implements ReaderEngine {
     })
     doc.addEventListener('pointerup', () => setTimeout(checkSelection, 10))
     doc.addEventListener('wheel', e => this.#callbacks.onWheel(e), { passive: true })
-    // al arrastrar con el dedo, foliate desliza la página siguiendo el dedo
-    doc.addEventListener(
-      'touchstart',
-      () => this.#view?.renderer.toggleAttribute('animated', this.#animateSwipes),
-      { passive: true },
-    )
+
+    // arrastrar la hoja: los gestos se pasan a Mitzi en coordenadas de la ventana
+    const forward = (type: PointerInfo['type'], e: PointerEvent) => {
+      const rect = doc.defaultView?.frameElement?.getBoundingClientRect()
+      if (!rect) return false
+      return this.#callbacks.onPointer({ type, x: rect.left + e.clientX, y: rect.top + e.clientY, pointerType: e.pointerType })
+    }
+    doc.addEventListener('pointerdown', e => forward('down', e) && e.preventDefault(), true)
+    doc.addEventListener('pointermove', e => forward('move', e) && e.preventDefault(), true)
+    doc.addEventListener('pointerup', e => {
+      if (forward('up', e)) this.#suppressClickAt = performance.now()
+    }, true)
+    doc.addEventListener('pointercancel', e => forward('cancel', e), true)
+    // con la hoja activa, foliate no debe deslizar la página por su cuenta
+    const blockTouch = (e: TouchEvent) => {
+      if (this.#flipEnabled) e.stopImmediatePropagation()
+    }
+    doc.addEventListener('touchstart', blockTouch, { capture: true, passive: true })
+    doc.addEventListener('touchmove', blockTouch, { capture: true, passive: true })
+    doc.addEventListener('touchend', blockTouch, { capture: true, passive: true })
+    // lo horizontal es para pasar página; lo vertical y el zoom quedan para el sistema
+    doc.documentElement.style.touchAction = 'pan-y pinch-zoom'
+
     doc.addEventListener('click', e => {
       if (e.defaultPrevented) return // enlaces: los maneja foliate
+      if (performance.now() - this.#suppressClickAt < 400) return // fue un arrastre
       const sel = doc.getSelection()
       if (sel && !sel.isCollapsed) return
       const frame = doc.defaultView?.frameElement

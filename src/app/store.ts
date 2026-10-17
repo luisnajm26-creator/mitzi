@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 type View = { name: 'shelf' } | { name: 'reader'; bookId: string }
 
-const LEAVE_MS = 220
+const LEAVE_MS = 320
 
 interface AppState {
   view: View

@@ -3,7 +3,7 @@ import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import type { ComfortSettings } from '../comfort/settings'
 import { loadPdfjs, pdfAssetOptions } from './pdfjs'
-import type { EngineCallbacks, OpenOptions, ReaderEngine, Snapshot, SpeechSource, TocEntry, ViewOptions } from './types'
+import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, SpeechSource, TocEntry, ViewOptions } from './types'
 
 type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
 
@@ -29,6 +29,8 @@ export class PdfEngine implements ReaderEngine {
   #resizeTimer: ReturnType<typeof setTimeout> | undefined
   #swipe: { x: number; y: number; t: number } | null = null
   #swipedAt = 0
+  /** El gesto en curso lo tomó Mitzi (arrastrar la hoja). */
+  #gestureTaken = false
   #view: ViewOptions = { bookMode: false, pageWidth: 0 }
   #aspect = 0.7
   #pdfjs: Awaited<ReturnType<typeof loadPdfjs>> | null = null
@@ -130,28 +132,42 @@ export class PdfEngine implements ReaderEngine {
     return this.#aspect
   }
 
-  async snapshot(): Promise<Snapshot | null> {
-    if (this.#settings.pdfFit === 'width') return null
-    const canvases = [...this.#sheet.querySelectorAll('canvas')]
-    if (!canvases.length) return null
-    return {
-      columns: canvases.map(canvas => {
-        // copia inmediata: el lienzo original se reemplaza al cambiar de página
-        const copy = document.createElement('canvas')
-        copy.width = canvas.width
-        copy.height = canvas.height
-        copy.getContext('2d')?.drawImage(canvas, 0, 0)
-        copy.className = 'pdf-snap'
-        Object.assign(copy.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' })
-        return {
-          rect: canvas.getBoundingClientRect(),
-          async mount(container: HTMLElement) {
-            container.append(copy)
-          },
-        }
-      }),
-    }
+  canFlip() {
+    if (!this.#doc || this.#settings.pdfFit === 'width') return false
+    // dos páginas fuera del modo libro (ventana horizontal pequeña): sin hoja
+    return this.#view.bookMode || this.#visible().length === 1
   }
+
+  /** Copia exacta (el mismo lienzo ya dibujado) de una página visible. */
+  async paintPage(slot: HTMLElement, side: PageSide, pageRect: DOMRect) {
+    slot.style.background = this.#theme.bg
+    const wraps = [...this.#sheet.querySelectorAll<HTMLElement>('.pdf-page')]
+    const wrap = side === 'single' ? wraps[0] : wraps.find(w => w.dataset.side === side)
+    const canvas = wrap?.querySelector('canvas')
+    if (!wrap || !canvas) {
+      slot.replaceChildren()
+      return false
+    }
+    const r = canvas.getBoundingClientRect()
+    const holder = document.createElement('div')
+    holder.className = 'pdf-snap-holder'
+    holder.dataset.dark = String(this.#theme.dark)
+    Object.assign(holder.style, { left: `${r.left - pageRect.left}px`, top: `${r.top - pageRect.top}px`, width: `${r.width}px`, height: `${r.height}px` })
+    const copy = document.createElement('canvas')
+    copy.width = canvas.width
+    copy.height = canvas.height
+    copy.getContext('2d')?.drawImage(canvas, 0, 0)
+    holder.append(copy)
+    const marks = wrap.querySelector('.pdf-marks')
+    if (marks) holder.append(marks.cloneNode(true))
+    slot.replaceChildren(holder)
+    return true
+  }
+
+  prewarm() {
+    // los lienzos ya están dibujados: no hay nada que preparar
+  }
+
 
   /** Lee las páginas visibles oración por oración y pasa de página al terminar. */
   async speech(lang?: string): Promise<SpeechSource | null> {
@@ -437,8 +453,25 @@ export class PdfEngine implements ReaderEngine {
   #bindInput() {
     document.addEventListener('selectionchange', this.#onSelectionChange)
     this.#stage.addEventListener('pointerup', () => setTimeout(() => this.#checkSelection(), 10))
+    // arrastrar la hoja: los gestos se pasan a Mitzi
+    const forward = (type: PointerInfo['type'], e: PointerEvent) =>
+      this.#cb.onPointer({ type, x: e.clientX, y: e.clientY, pointerType: e.pointerType })
+    this.#stage.addEventListener('pointerdown', e => {
+      this.#gestureTaken = false
+      if (forward('down', e)) e.preventDefault()
+    })
+    this.#stage.addEventListener('pointermove', e => {
+      if (forward('move', e)) {
+        this.#gestureTaken = true
+        e.preventDefault()
+      }
+    })
+    this.#stage.addEventListener('pointerup', e => {
+      if (forward('up', e)) this.#swipedAt = performance.now()
+    })
+    this.#stage.addEventListener('pointercancel', e => forward('cancel', e))
     this.#stage.addEventListener('click', e => {
-      // un deslizamiento también dispara "click"; ese no cuenta como toque
+      // un deslizamiento o arrastre también dispara "click"; ese no cuenta como toque
       if (performance.now() - this.#swipedAt < 400) return
       const sel = window.getSelection()
       if (sel && !sel.isCollapsed) return
@@ -461,7 +494,7 @@ export class PdfEngine implements ReaderEngine {
     this.#stage.addEventListener('pointerup', e => {
       const s = this.#swipe
       this.#swipe = null
-      if (!s) return
+      if (!s || this.#gestureTaken) return
       const dx = e.clientX - s.x
       const dy = e.clientY - s.y
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && performance.now() - s.t < 600) {

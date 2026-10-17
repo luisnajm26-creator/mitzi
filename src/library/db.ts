@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie'
 import type { Palette } from './palette'
+import { guessSeries, seriesKeyOf } from './series'
 
 export type BookFormat = 'epub' | 'pdf'
 
@@ -15,9 +16,14 @@ export interface BookRecord {
   language?: string
   /** Páginas (PDF) o páginas estimadas (EPUB); da el grosor del libro. */
   pages: number
-  cover?: Blob
+  /** La portada está guardada aparte (tabla covers) para que la lista de libros pese poco. */
+  hasCover?: boolean
   /** ancho / alto de la portada */
   coverAspect: number
+  /** Serie (de los datos del libro o deducida del título) y número de tomo. */
+  series?: string
+  seriesIndex?: number
+  seriesKey?: string
   palette: Palette
   addedAt: number
   lastOpenedAt?: number
@@ -65,11 +71,17 @@ export interface AnnotationRecord {
   deleted?: boolean
 }
 
+export interface CoverRecord {
+  id: string
+  blob: Blob
+}
+
 class MitziDB extends Dexie {
   books!: Table<BookRecord, string>
   files!: Table<FileRecord, string>
   progress!: Table<ProgressRecord, string>
   annotations!: Table<AnnotationRecord, string>
+  covers!: Table<CoverRecord, string>
 
   constructor() {
     super('mitzi')
@@ -81,6 +93,29 @@ class MitziDB extends Dexie {
     this.version(2).stores({
       annotations: 'id, bookId, updatedAt',
     })
+    // las portadas pasan a su propia tabla y cada libro guarda su serie
+    this.version(3)
+      .stores({
+        books: 'id, path, lastOpenedAt, addedAt, seriesKey',
+        covers: 'id',
+      })
+      .upgrade(async tx => {
+        const books = tx.table('books')
+        const covers = tx.table('covers')
+        for (const b of (await books.toArray()) as (BookRecord & { cover?: Blob })[]) {
+          if (b.cover) await covers.put({ id: b.id, blob: b.cover })
+          const guess = b.series ? null : guessSeries(b.title)
+          const { cover, ...rest } = b
+          const series = b.series ?? guess?.series
+          await books.put({
+            ...rest,
+            hasCover: !!cover,
+            series,
+            seriesIndex: b.seriesIndex ?? guess?.index,
+            seriesKey: series ? seriesKeyOf(series) : undefined,
+          })
+        }
+      })
   }
 }
 

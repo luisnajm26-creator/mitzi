@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { clamp, isDark, mix } from '../lib/color'
-import type { BookRecord } from '../library/db'
+import { db, type BookRecord } from '../library/db'
 import { loadImage } from '../library/metadata'
 
 export const BOOK_HEIGHT = 2.1
@@ -282,13 +282,14 @@ export function createBookModel(book: BookRecord, dims: BookDims, anisotropy: nu
     spineTex.needsUpdate = true
     pageTex.image = firstPageCanvas(book, w / h)
     pageTex.needsUpdate = true
-    if (!book.cover) {
+    const cover = book.hasCover ? await db.covers.get(book.id) : undefined
+    if (!cover) {
       placeholder.image = generatedCover(book, w / h)
       placeholder.needsUpdate = true
       return
     }
     try {
-      const img = await loadImage(book.cover)
+      const img = await loadImage(cover.blob)
       if (disposed) return
       const scale = Math.min(1, MAX_COVER_PX / img.naturalHeight)
       const [canvas, ctx] = makeCanvas(Math.round(img.naturalWidth * scale), Math.round(img.naturalHeight * scale))

@@ -19,6 +19,8 @@ const paths = {
   pause: 'M7 4h3.5v16H7zM13.5 4H17v16h-3.5z',
   speaker: 'M4 9.5v5h4l5 4v-13l-5 4zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
   stop: 'M6 6h12v12H6z',
+  search: 'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.8-4.8',
+  grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
 } as const
 
 export type IconName = keyof typeof paths

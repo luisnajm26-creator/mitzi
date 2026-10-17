@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { mix } from '../lib/color'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
 import { refreshLibrary } from '../library/store'
@@ -10,13 +9,13 @@ import { effectiveSettings, effectiveTheme, useReaderSettings } from './comfort/
 import { EpubEngine } from './engines/epubEngine'
 import { PdfEngine } from './engines/pdfEngine'
 import type { EngineCallbacks, ReaderEngine, ReaderLocation, TocEntry, ViewOptions } from './engines/types'
-import { computeBookGeometry, OpenBookBase, OpenBookGutter } from './layouts/OpenBook'
-import { PageTurner } from './pageTurn/PageTurner'
+import { bookColors, computeBookGeometry, OpenBookBase, OpenBookGutter } from './layouts/OpenBook'
+import { PageFlip, type FlipContext } from './pageTurn/PageFlip'
 import { TocPanel } from './TocPanel'
 import { ReadAloudBar, useReadAloud } from './tts/ReadAloud'
 import { AnnotationPopover, NoteEditor, NotesPanel, SelectionMenu } from './annotations/Annotations'
 import type { AnnotationRecord, HighlightColor } from '../library/db'
-import type { TextSelection } from './engines/types'
+import type { PointerInfo, TextSelection } from './engines/types'
 import './reader.css'
 
 type Panel = null | 'toc' | 'comfort' | 'notes'
@@ -33,8 +32,11 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   const rootRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const turnLayerRef = useRef<HTMLDivElement>(null)
-  const turnerRef = useRef<PageTurner | null>(null)
+  const flipUnderRef = useRef<HTMLDivElement>(null)
+  const flipOverRef = useRef<HTMLDivElement>(null)
+  const flipRef = useRef<PageFlip | null>(null)
+  /** gesto de arrastre en curso sobre la página */
+  const gesture = useRef<{ sx: number; sy: number; zone: number; type: string; active: boolean } | null>(null)
   const engineRef = useRef<ReaderEngine | null>(null)
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const [pageAspect, setPageAspect] = useState(0.66)
@@ -92,27 +94,83 @@ export default function Reader({ bookId }: { bookId: string }) {
     closeBook()
   }, [saveNow, closeBook])
 
-  /** Pasa de página, con la hoja que gira si la animación está activada. */
+  const flipContext = (): FlipContext | null => {
+    const stage = stageRef.current
+    if (!stage) return null
+    return { book: latest.current.view.bookMode, stage: stage.getBoundingClientRect(), dark: latest.current.theme.dark }
+  }
+
+  /** Frecuencia alta mientras se mueve la hoja; en reposo la pantalla vuelve a ahorrar. */
+  const boostRefresh = useCallback(() => {
+    platform.setHighRefresh?.(true)
+    clearTimeout(refreshTimer.current)
+    refreshTimer.current = setTimeout(() => {
+      if (!flipRef.current?.busy) platform.setHighRefresh?.(false)
+    }, 1500)
+  }, [])
+
+  /** Pasa de página, con la hoja de papel si la animación está activada. */
   const turn = useCallback((dir: 1 | -1) => {
     const engine = engineRef.current
-    const stage = stageRef.current
-    if (!engine || !stage) return
-    const { settings: s, theme: t, view: v } = latest.current
-    const paged = engine.format === 'pdf' || s.flow === 'paginated'
-    if (!s.animatePages || !paged || !turnerRef.current) {
+    const ctx = flipContext()
+    if (!engine || !ctx) return
+    if (!latest.current.settings.animatePages || !flipRef.current || !engine.canFlip()) {
       if (dir > 0) engine.next()
       else engine.prev()
       return
     }
-    // frecuencia alta solo mientras gira la hoja; en reposo la pantalla vuelve a ahorrar
-    platform.setHighRefresh?.(true)
-    clearTimeout(refreshTimer.current)
-    turnerRef.current
-      .turn(engine, dir, { book: v.bookMode, pages: stage.getBoundingClientRect(), bg: t.bg, dark: t.dark })
-      .finally(() => {
-        refreshTimer.current = setTimeout(() => platform.setHighRefresh?.(false), 1200)
-      })
-  }, [])
+    boostRefresh()
+    flipRef.current.turn(engine, dir, ctx).finally(boostRefresh)
+  }, [boostRefresh])
+
+  /**
+   * Arrastrar la hoja: con el ratón desde el borde de la página; con el dedo,
+   * deslizando a un lado en cualquier parte. Al soltar termina de girar o vuelve.
+   */
+  const onPointer = (e: PointerInfo): boolean => {
+    const engine = engineRef.current
+    const flip = flipRef.current
+    const stage = stageRef.current?.getBoundingClientRect()
+    if (!engine || !flip || !stage || !latest.current.settings.animatePages || !engine.canFlip()) return false
+    const g = gesture.current
+    if (e.type === 'down') {
+      if (latest.current.panel || flip.busy) return false
+      const rel = (e.x - stage.left) / stage.width
+      const zone = e.pointerType === 'mouse' ? (rel > 0.85 ? 1 : rel < 0.15 ? -1 : 0) : 2
+      gesture.current = { sx: e.x, sy: e.y, zone, type: e.pointerType, active: false }
+      // tomar la esquina con el ratón no debe empezar a seleccionar texto
+      return e.pointerType === 'mouse' && zone !== 0
+    }
+    if (!g) return false
+    if (e.type === 'move') {
+      if (g.active) {
+        flip.dragTo(e.x, e.y)
+        return true
+      }
+      const dx = e.x - g.sx
+      const dy = e.y - g.sy
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.2) return false
+      if (g.type === 'mouse' && (g.zone === 0 || Math.sign(dx) === g.zone)) return false
+      const dir: 1 | -1 = g.type === 'mouse' ? (g.zone > 0 ? 1 : -1) : dx < 0 ? 1 : -1
+      const ctx = flipContext()
+      if (!ctx) return false
+      g.active = true
+      engine.clearSelection()
+      setSelection(null)
+      setChrome(false)
+      boostRefresh()
+      flip.beginDrag(engine, dir, ctx, g.sx, g.sy).then(boostRefresh)
+      flip.dragTo(e.x, e.y)
+      return true
+    }
+    // up / cancel
+    gesture.current = null
+    if (!g.active) return false
+    flip.endDrag()
+    return true
+  }
+  const onPointerRef = useRef(onPointer)
+  onPointerRef.current = onPointer
 
   // acciones que llaman los motores; leen siempre el estado más reciente
   const actions = useRef({
@@ -178,6 +236,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       onKey: e => actions.current.key(e),
       onWheel: e => actions.current.wheel(e),
       onSwipe: dir => turn(dir),
+      onPointer: e => onPointerRef.current(e),
       onSelect: sel => {
         setSelection(sel)
         if (sel) setTapped(null)
@@ -220,7 +279,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       clearTimeout(saveTimer.current)
       clearTimeout(hideTimer.current)
       saveNow()
-      turnerRef.current?.cancel()
+      gesture.current = null
       engine?.destroy()
       engineRef.current = null
     }
@@ -290,9 +349,51 @@ export default function Reader({ bookId }: { bookId: string }) {
       setSize(prev => (prev.w === width && prev.h === height ? prev : { w: width, h: height }))
     })
     ro.observe(root)
-    turnerRef.current = turnLayerRef.current ? new PageTurner(turnLayerRef.current) : null
+    if (flipUnderRef.current && flipOverRef.current) {
+      const flip = new PageFlip(flipUnderRef.current, flipOverRef.current)
+      // tras cada giro, las copias del capítulo se preparan para el siguiente
+      flip.onFinish = () => engineRef.current?.prewarm(flip.slots)
+      flipRef.current = flip
+    }
     return () => ro.disconnect()
   }, [])
+
+  // los márgenes de la página quedan fuera del documento del EPUB: ahí también se puede tomar la hoja
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage || book?.format !== 'epub') return
+    const handle = (type: PointerInfo['type']) => (e: PointerEvent) => {
+      const taken = onPointerRef.current({ type, x: e.clientX, y: e.clientY, pointerType: e.pointerType })
+      if (type === 'down' && taken) {
+        e.preventDefault()
+        stage.setPointerCapture(e.pointerId)
+      }
+    }
+    const down = handle('down')
+    const move = handle('move')
+    const up = handle('up')
+    const cancel = handle('cancel')
+    stage.addEventListener('pointerdown', down)
+    stage.addEventListener('pointermove', move)
+    stage.addEventListener('pointerup', up)
+    stage.addEventListener('pointercancel', cancel)
+    return () => {
+      stage.removeEventListener('pointerdown', down)
+      stage.removeEventListener('pointermove', move)
+      stage.removeEventListener('pointerup', up)
+      stage.removeEventListener('pointercancel', cancel)
+    }
+  }, [book?.format])
+
+  // mientras se lee, se preparan las copias de la página con tiempo: el giro empieza al instante
+  useEffect(() => {
+    if (status !== 'ready' || !settings.animatePages) return
+    const id = setTimeout(() => {
+      const flip = flipRef.current
+      if (flip && !flip.busy) engineRef.current?.prewarm(flip.slots)
+    }, 700)
+    return () => clearTimeout(id)
+  }, [loc, status, settings, theme, view, annotations])
 
   // pantalla encendida: si lo pide el ajuste o mientras se lee en voz alta
   const awake = settings.keepAwake || tts.state === 'playing'
@@ -356,6 +457,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     setScrub(null)
   }
 
+  const desk = book ? bookColors(book.palette, theme) : null
   const vars = {
     '--r-bg': theme.bg,
     '--r-fg': theme.fg,
@@ -364,10 +466,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     '--r-border': theme.border,
     '--r-link': theme.link,
     '--r-fill': `${fraction * 100}%`,
-    ...(book && {
-      '--desk-a': mix(book.palette.dark, theme.dark ? '#000000' : theme.bg, theme.dark ? 0.35 : 0.12),
-      '--desk-b': mix(book.palette.dark, '#000000', 0.55),
-    }),
+    ...(desk && { '--desk-a': desk.deskA, '--desk-b': desk.deskB }),
   } as CSSProperties
   const stageStyle: CSSProperties | undefined = bookGeo
     ? { left: bookGeo.left, top: bookGeo.top, width: bookGeo.width, height: bookGeo.height, right: 'auto', bottom: 'auto', padding: 0 }
@@ -379,8 +478,9 @@ export default function Reader({ bookId }: { bookId: string }) {
     <div ref={rootRef} className="reader" data-dark={theme.dark} data-chrome={showChrome} data-leaving={leaving} data-book={!!bookGeo} style={vars}>
       {bookGeo && book && <OpenBookBase geo={bookGeo} progress={fraction} palette={book.palette} theme={theme} />}
       <div className="reader-stage" ref={stageRef} style={stageStyle} />
-      <div className="turn-layer" ref={turnLayerRef} aria-hidden />
-      {bookGeo && <OpenBookGutter geo={bookGeo} progress={fraction} />}
+      <div className="flip-under" ref={flipUnderRef} aria-hidden />
+      {bookGeo && <OpenBookGutter geo={bookGeo} progress={fraction} dark={theme.dark} />}
+      <div className="flip-over" ref={flipOverRef} aria-hidden />
 
       {status === 'loading' && (
         <div className="reader-status">

@@ -5,14 +5,23 @@ import type { LibraryFolders } from '../platform/types'
 import { useLibrary } from '../library/store'
 import { db } from '../library/db'
 import { syncLibrary } from '../library/scanner'
+import { carouselBooks, useLibraryQuery, type CarouselFilter } from '../library/query'
+import { Explorer } from './Explorer'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
 import { AmbientBackground } from './AmbientBackground'
-import { createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
+import { CLOSE_MS, createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
 import { Icon } from '../ui/Icon'
 import './shelf.css'
 
 export function Shelf({ active }: { active: boolean }) {
-  const books = useLibrary(s => s.books)
+  const allBooks = useLibrary(s => s.books)
+  const carouselFilter = useLibraryQuery(s => s.carousel)
+  const setCarouselFilter = useLibraryQuery(s => s.setCarousel)
+  // el carrusel muestra todo, o solo la serie o el autor elegidos en el explorador
+  const books = useMemo(() => carouselBooks(allBooks, carouselFilter), [allBooks, carouselFilter])
+  const [explorerOpen, setExplorerOpen] = useState(false)
+  /** libro que se eligió en el explorador: el carrusel lo busca cuando la lista se actualiza */
+  const pendingPick = useRef<string | null>(null)
   const progress = useLibrary(s => s.progress)
   const loaded = useLibrary(s => s.loaded)
   const scanning = useLibrary(s => s.scanning)
@@ -20,27 +29,69 @@ export function Shelf({ active }: { active: boolean }) {
   const motion = useMemo(createMotion, [])
   const [center, setCenter] = useState(0)
   const [opening, setOpening] = useState(false)
+  const [closing, setClosing] = useState(false)
   const [foldersOpen, setFoldersOpen] = useState(false)
   const curtainColor = useReaderSettings(s => effectiveTheme(s).bg)
   const wasActive = useRef(active)
 
   const book = books[Math.min(center, books.length - 1)] ?? null
 
-  // al volver del lector, el libro que leías queda al centro (es el primero)
+  useEffect(() => {
+    const id = pendingPick.current
+    if (!id) return
+    pendingPick.current = null
+    const index = books.findIndex(b => b.id === id)
+    if (index < 0) return
+    // cerca: se desliza; lejos: salta directo para no recorrer cientos de libros
+    if (Math.abs(index - motion.ctrl.center) > 8) motion.ctrl.jumpTo(index)
+    else motion.ctrl.goTo(index)
+    motion.wake?.()
+  }, [books, motion])
+
+  const pickBook = (id: string) => {
+    setExplorerOpen(false)
+    pendingPick.current = id
+    if (carouselFilter && !books.some(b => b.id === id)) setCarouselFilter(null)
+    else {
+      // la lista no cambia: se busca ya
+      const index = books.findIndex(b => b.id === id)
+      if (index >= 0) {
+        pendingPick.current = null
+        if (Math.abs(index - motion.ctrl.center) > 8) motion.ctrl.jumpTo(index)
+        else motion.ctrl.goTo(index)
+        motion.wake?.()
+      }
+    }
+  }
+
+  const showGroup = (filter: CarouselFilter) => {
+    setExplorerOpen(false)
+    setCarouselFilter(filter)
+    motion.ctrl.jumpTo(0)
+    setCenter(0)
+    motion.wake?.()
+  }
+
+  // al volver del lector, el libro que leías (ahora el primero) se cierra y vuelve a su lugar
   useEffect(() => {
     if (active && !wasActive.current) {
       motion.openingAt = null
-      motion.intensity.current = 1
       motion.ctrl.jumpTo(0)
       setCenter(0)
       setOpening(false)
+      motion.closingAt = performance.now()
+      motion.wake?.()
+      setClosing(true)
+      const id = setTimeout(() => setClosing(false), CLOSE_MS)
+      wasActive.current = active
+      return () => clearTimeout(id)
     }
     wasActive.current = active
   }, [active, motion])
 
   const open = (index: number) => {
     const target = books[index]
-    if (!target || opening) return
+    if (!target || opening || closing) return
     motion.ctrl.jumpTo(index)
     motion.openingAt = performance.now()
     motion.wake?.()
@@ -52,7 +103,7 @@ export function Shelf({ active }: { active: boolean }) {
   useEffect(() => {
     if (!active) return
     const onKey = (e: KeyboardEvent) => {
-      if (foldersOpen) return
+      if (foldersOpen || explorerOpen) return
       if (e.key === 'ArrowRight') motion.ctrl.step(1)
       else if (e.key === 'ArrowLeft') motion.ctrl.step(-1)
       else if (e.key === 'Home') motion.ctrl.goTo(0)
@@ -69,7 +120,7 @@ export function Shelf({ active }: { active: boolean }) {
   const percent = p ? Math.round(p.fraction * 100) : 0
 
   return (
-    <section className="shelf" data-active={active} data-opening={opening} aria-hidden={!active}>
+    <section className="shelf" data-active={active} data-opening={opening || closing} aria-hidden={!active}>
       <AmbientBackground palette={book?.palette ?? null} />
       {books.length > 0 && (
         <Shelf3D
@@ -86,12 +137,31 @@ export function Shelf({ active }: { active: boolean }) {
         <div className="brand">
           <img src="./icon.svg" alt="" />
           <span>Mitzi</span>
+          {carouselFilter && (
+            <button
+              className="filter-chip"
+              onClick={() => {
+                setCarouselFilter(null)
+                motion.ctrl.jumpTo(0)
+                setCenter(0)
+              }}
+              title="Ver todos los libros"
+            >
+              {carouselFilter.kind === 'serie' ? 'Serie' : 'Autor'}: {carouselFilter.label}
+              <Icon name="close" size={14} />
+            </button>
+          )}
         </div>
         <div className="shelf-actions">
           {books.length > 0 && (
             <span className="shelf-count">
               {center + 1} / {books.length}
             </span>
+          )}
+          {allBooks.length > 0 && (
+            <button className="icon-button" onClick={() => setExplorerOpen(true)} title="Buscar y explorar la biblioteca" aria-label="Buscar">
+              <Icon name="search" />
+            </button>
           )}
           <button className="icon-button" onClick={() => setFoldersOpen(true)} title="Carpetas de libros">
             <Icon name="folder" />
@@ -108,6 +178,11 @@ export function Shelf({ active }: { active: boolean }) {
         <div className="shelf-info" key={book.id}>
           <h1 className="shelf-title">{book.title}</h1>
           {book.author && <p className="shelf-author">{book.author}</p>}
+          {book.series && book.seriesIndex !== undefined && (
+            <p className="shelf-series">
+              {book.series} · Tomo {book.seriesIndex}
+            </p>
+          )}
           <div className="shelf-meta">
             <span className="badge">{book.format.toUpperCase()}</span>
             {p ? (
@@ -138,13 +213,14 @@ export function Shelf({ active }: { active: boolean }) {
         </>
       )}
 
-      {loaded && books.length === 0 && !scanning && <EmptyState onFolders={() => setFoldersOpen(true)} />}
+      {loaded && allBooks.length === 0 && !scanning && <EmptyState onFolders={() => setFoldersOpen(true)} />}
       {scanning && (
         <div className="scan-toast">
           Leyendo libros… {scanning.done} / {scanning.total}
         </div>
       )}
       {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}
+      {explorerOpen && <Explorer onClose={() => setExplorerOpen(false)} onPick={pickBook} onShowGroup={showGroup} />}
       <div
         className="shelf-curtain"
         data-on={opening}

@@ -6,7 +6,7 @@
   color: var(--r-fg);
   color-scheme: light;
   animation: reader-in 320ms ease both;
-  transition: background-color 300ms ease, opacity 220ms ease;
+  transition: background-color 300ms ease, opacity 320ms ease;
 }
 
 .reader[data-dark='true'] {
@@ -45,18 +45,10 @@
   z-index: 1;
 }
 
-.book-base > div,
+.book-base,
 .book-gutter {
   position: absolute;
   pointer-events: none;
-}
-
-.book-board {
-  border-radius: 10px;
-  box-shadow:
-    0 30px 60px rgba(0, 0, 0, 0.45),
-    0 8px 18px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 
 .book-gutter {
@@ -64,76 +56,122 @@
   mix-blend-mode: multiply;
 }
 
-/* ---------- hoja que gira al pasar página ---------- */
-.turn-layer {
+/* en oscuro la sombra va encima tal cual (multiplicar un negro no cambia nada) */
+.book-gutter[data-dark='true'] {
+  mix-blend-mode: normal;
+}
+
+/* ---------- hoja de papel al pasar página ---------- */
+/* debajo del sombreado del lomo: las copias quietas y la parte plana de la hoja */
+.flip-under,
+.flip-over {
   position: absolute;
   inset: 0;
-  z-index: 2;
   pointer-events: none;
+  visibility: hidden;
 }
 
-.turn-scene {
+.flip-under {
+  z-index: 2;
+}
+
+/* encima del lomo: la parte doblada de la hoja */
+.flip-over {
+  z-index: 4;
+}
+
+.flip-slot {
   position: absolute;
-  inset: 0;
-  perspective: 2400px;
-}
-
-.turn-cast,
-.turn-leaf,
-.turn-face,
-.turn-slot {
-  position: absolute;
-}
-
-.turn-cast {
-  opacity: 0;
-}
-
-.turn-leaf {
-  transform-style: preserve-3d;
-  will-change: transform;
-}
-
-.turn-face {
-  left: 0;
-  top: 0;
   overflow: hidden;
-  backface-visibility: hidden;
   isolation: isolate;
+  transform-origin: 0 0;
+  will-change: transform, clip-path;
 }
 
-.turn-leaf .turn-face {
-  box-shadow: 0 0 18px rgba(0, 0, 0, 0.12);
+/* una sola página: el reverso deja ver el texto al trasluz */
+.flip-slot[data-faint='true'] > * {
+  opacity: 0.1;
 }
 
-.turn-face.back {
-  transform: rotateY(180deg);
-}
-
-.turn-content {
+.ghost-win {
   position: absolute;
-  inset: 0;
+  overflow: hidden;
 }
 
-.turn-shade {
+.ghost-frame {
   position: absolute;
-  inset: 0;
-  opacity: 0;
-  background: linear-gradient(to right, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.06) 70%, rgba(0, 0, 0, 0.12));
-}
-
-.page-snap {
+  top: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: none;
   color-scheme: normal;
 }
 
-/* las capturas de PDF toman el color del tema igual que las páginas */
-.turn-layer[data-dark='false'] .pdf-snap {
+.flip-shadow {
+  position: absolute;
+  inset: 0;
+}
+
+.flip-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+/* sombra que la hoja levantada proyecta sobre la página que aparece */
+.flip-under .flip-bar {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.12) 35%, rgba(0, 0, 0, 0));
+}
+
+/* curvatura del papel en la parte doblada: sombra en el pliegue y un brillo suave */
+.flip-over .flip-bar {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.26) 0%,
+    rgba(0, 0, 0, 0.06) 4%,
+    rgba(255, 255, 255, 0.2) 9%,
+    rgba(255, 255, 255, 0) 24%,
+    rgba(0, 0, 0, 0) 72%,
+    rgba(0, 0, 0, 0.08) 100%
+  );
+}
+
+.flip-over .flip-shadow[data-dark='true'] .flip-bar {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.12) 5%,
+    rgba(255, 255, 255, 0.06) 10%,
+    rgba(255, 255, 255, 0) 26%,
+    rgba(0, 0, 0, 0) 72%,
+    rgba(0, 0, 0, 0.18) 100%
+  );
+}
+
+/* copias de PDF: toman el color del tema igual que las páginas */
+.pdf-snap-holder {
+  position: absolute;
+}
+
+.pdf-snap-holder canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pdf-snap-holder[data-dark='false'] canvas {
   mix-blend-mode: multiply;
 }
 
-.turn-layer[data-dark='true'] .pdf-snap {
+.pdf-snap-holder[data-dark='true'] canvas {
   filter: invert(1) hue-rotate(180deg) brightness(0.88);
   mix-blend-mode: screen;
+}
+
+.pdf-snap-holder .pdf-marks {
+  position: absolute;
+  inset: 0;
 }
 
 /* ---------- PDF ---------- */

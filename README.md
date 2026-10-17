@@ -10,9 +10,10 @@ Tu biblioteca se muestra como el selector de un videojuego: el libro elegido gir
 
 - **Biblioteca que se llena sola**: en PC vigila `Documentos\Mitzi Libros` y otras carpetas que elijas; en Android usas el selector de carpetas del sistema o "Abrir con Mitzi". Los libros aparecen y desaparecen sin reiniciar.
 - **Carrusel 3D**: el libro central gira bajo un haz de luz con polvo flotando; el fondo toma los colores de la portada. Se maneja arrastrando, con la rueda, con las flechas o tocando un libro.
-- **Abrir un libro**: el libro se pone de frente, la tapa gira sobre el lomo y la cámara entra a la primera página.
+- **Abrir y cerrar un libro**: el libro se pone de frente, la tapa gira sobre el lomo y la cámara entra a la primera página; al salir, se cierra y vuelve al estante.
+- **Explorar la biblioteca**: búsqueda por título, autor o serie (sin importar tildes), filtros Leyendo / Sin empezar / Terminados, libros agrupados por serie (con número de tomo) o por autor, y opción de ver solo una serie en el carrusel. Pensado para bibliotecas de miles de libros.
 - **Libro abierto** (PC y tablet en horizontal): tapa dura, dos páginas, sombra en el lomo y un bloque de hojas a cada lado que cambia con tu avance, como un libro de papel.
-- **Pasar página** con una hoja que gira sobre el lomo, en EPUB y PDF.
+- **Pasar página como papel**: la hoja se dobla desde la esquina y se puede arrastrar con el dedo o el ratón; si la sueltas antes de la mitad, vuelve. Usa copias exactas de las páginas, así el texto nunca salta.
 - **Lectura cómoda**: 17 fondos (claros, 7 pasteles y oscuros) más uno a tu gusto, texto con contraste calculado, 5 tipografías (incluida OpenDyslexic), tamaño, interlineado, márgenes, brillo, filtro cálido, modo noche automático y ajustes por libro.
 - **Subrayados y notas** en 5 colores, con panel de notas y exportación a Markdown.
 - **Lectura en voz alta** con las voces del sistema: resalta la oración que lee, pasa de página sola y tiene temporizador para dormir.

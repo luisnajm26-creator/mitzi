@@ -2,6 +2,7 @@ import type { Contributor, LanguageMap } from 'foliate-js/view.js'
 import { loadPdfjs, pdfAssetOptions } from '../reader/engines/pdfjs'
 import type { BookFormat } from './db'
 import { paletteFromImage, paletteFromSeed, type Palette } from './palette'
+import { guessSeries } from './series'
 
 export interface ExtractedBook {
   title: string
@@ -11,6 +12,18 @@ export interface ExtractedBook {
   cover?: Blob
   coverAspect: number
   palette: Palette
+  series?: string
+  seriesIndex?: number
+}
+
+/** Serie del EPUB (EPUB 3 o calibre) si la trae; si no, se deduce del título. */
+function seriesOf(title: string, belongsTo: unknown) {
+  const raw = (belongsTo as { series?: unknown } | undefined)?.series
+  const one = (Array.isArray(raw) ? raw[0] : raw) as { name?: LanguageMap; position?: number } | null | undefined
+  const name = formatLanguageMap(one?.name).trim()
+  if (name) return { series: name, seriesIndex: Number.isFinite(one?.position) ? one!.position : guessSeries(title)?.index }
+  const guess = guessSeries(title)
+  return guess ? { series: guess.series, seriesIndex: guess.index } : {}
 }
 
 const COVER_HEIGHT = 1024
@@ -58,6 +71,7 @@ async function extractEpub(file: File): Promise<ExtractedBook> {
     cover: cover?.blob,
     coverAspect: cover?.aspect ?? 0.68,
     palette: cover?.palette ?? paletteFromSeed(title + author),
+    ...seriesOf(title, md.belongsTo),
   }
 }
 
@@ -89,6 +103,7 @@ async function extractPdf(file: File): Promise<ExtractedBook> {
       cover: blob ?? undefined,
       coverAspect: base.width / base.height,
       palette,
+      ...seriesOf(title, null),
     }
   } finally {
     await task.destroy()

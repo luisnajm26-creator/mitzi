@@ -14,6 +14,8 @@ const SPIN_SPEED = 0.42
 const IDLE_MS = 25_000
 /** Duración de la animación de abrir un libro. */
 export const OPEN_MS = 1300
+/** Al volver del lector, la misma animación al revés: el libro se cierra y vuelve al estante. */
+export const CLOSE_MS = 1150
 /** Libros que se montan a cada lado del central. */
 const WINDOW = 6
 
@@ -21,13 +23,14 @@ export interface ShelfMotion {
   ctrl: CarouselController
   spin: { speed: number }
   openingAt: number | null
+  closingAt: number | null
   intensity: { current: number }
   /** Reanuda el dibujo si estaba en pausa (lo asigna Shelf3D). */
   wake?: () => void
 }
 
 export function createMotion(): ShelfMotion {
-  return { ctrl: new CarouselController(), spin: { speed: SPIN_SPEED }, openingAt: null, intensity: { current: 1 } }
+  return { ctrl: new CarouselController(), spin: { speed: SPIN_SPEED }, openingAt: null, closingAt: null, intensity: { current: 1 } }
 }
 
 interface Layout {
@@ -82,9 +85,16 @@ const wrapAngle = (a: number) => a - Math.PI * 2 * Math.round(a / (Math.PI * 2))
  * front: el libro se pone de frente y se acerca; cover: la tapa gira sobre el lomo;
  * zoom: la cámara entra a la primera página; fade: el foco se apaga.
  */
-function openingStages(openingAt: number | null) {
-  if (openingAt === null) return null
-  const p = clamp01((performance.now() - openingAt) / OPEN_MS)
+function openingStages(motion: ShelfMotion) {
+  let p: number
+  if (motion.openingAt !== null) p = clamp01((performance.now() - motion.openingAt) / OPEN_MS)
+  else if (motion.closingAt !== null) {
+    p = 1 - clamp01((performance.now() - motion.closingAt) / CLOSE_MS)
+    if (p <= 0) {
+      motion.closingAt = null
+      return null
+    }
+  } else return null
   return {
     front: smooth(clamp01(p / 0.3)),
     cover: easeInOut(clamp01((p - 0.18) / 0.47)),
@@ -130,7 +140,7 @@ const Book = memo(function Book({ book, index, motion, layout, anisotropy, onTap
     const near = Math.min(a, 1)
     const far = Math.max(0, a - 1)
     const centerW = smooth(clamp01(1 - a * 1.4))
-    const stages = openingStages(motion.openingAt)
+    const stages = openingStages(motion)
     const isOpening = stages !== null && index === ctrl.center
     const front = isOpening ? stages.front : 0
 
@@ -267,7 +277,7 @@ function Scene({ books, motion, palette, onCenterChange, onTap, onSleep }: Scene
     spin.speed += (target - spin.speed) * (1 - Math.exp(-dt * 1.6))
 
     // al abrir un libro: luz de lectura desde la cámara y el foco se apaga al final
-    const stages = openingStages(motion.openingAt)
+    const stages = openingStages(motion)
     if (readLight.current) readLight.current.intensity = 0.5 + 1.6 * (stages?.front ?? 0)
     motion.intensity.current = 1 - (stages?.fade ?? 0)
 
@@ -281,7 +291,7 @@ function Scene({ books, motion, palette, onCenterChange, onTap, onSleep }: Scene
       setCenter(ctrl.center)
       onCenterChange(ctrl.center)
     }
-    if (idleFor > IDLE_MS + 3500 && ctrl.settled && motion.openingAt === null) onSleep()
+    if (idleFor > IDLE_MS + 3500 && ctrl.settled && motion.openingAt === null && motion.closingAt === null) onSleep()
   })
 
   const floorY = layout.bookY - BOOK_HEIGHT / 2 - 0.03

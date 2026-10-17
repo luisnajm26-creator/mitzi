@@ -67,6 +67,7 @@ declare module 'foliate-js/view.js' {
     addAnnotation(annotation: ViewAnnotation, remove?: boolean): Promise<{ index: number; label: string } | undefined>
     deleteAnnotation(annotation: ViewAnnotation): Promise<unknown>
     getCFI(index: number, range: Range): string
+    resolveCFI(cfi: string): { index: number; anchor: (doc: Document) => Range | Element }
     initTTS(granularity?: 'word' | 'sentence', highlight?: (range: Range) => void): Promise<void>
     tts: {
       start(): string | undefined
