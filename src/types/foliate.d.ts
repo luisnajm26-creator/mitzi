@@ -49,6 +49,10 @@ declare module 'foliate-js/view.js' {
     getContents(): { index: number; doc: Document; overlayer?: unknown }[]
     readonly page: number
     readonly pages: number
+    /** ancho visible del contenedor (px) */
+    readonly size: number
+    /** desplazamiento actual del contenedor (px) */
+    readonly start: number
     destroy(): void
   }
 

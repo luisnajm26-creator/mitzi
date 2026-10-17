@@ -2,7 +2,7 @@ import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask
 import type { ThemeColors } from '../comfort/contrast'
 import type { ComfortSettings } from '../comfort/settings'
 import { loadPdfjs, pdfAssetOptions } from './pdfjs'
-import type { EngineCallbacks, OpenOptions, ReaderEngine, TocEntry } from './types'
+import type { EngineCallbacks, OpenOptions, ReaderEngine, Snapshot, TocEntry, ViewOptions } from './types'
 
 type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
 
@@ -28,6 +28,8 @@ export class PdfEngine implements ReaderEngine {
   #resizeTimer: ReturnType<typeof setTimeout> | undefined
   #swipe: { x: number; y: number; t: number } | null = null
   #swipedAt = 0
+  #view: ViewOptions = { bookMode: false, pageWidth: 0 }
+  #aspect = 0.7
 
   constructor(callbacks: EngineCallbacks) {
     this.#cb = callbacks
@@ -37,7 +39,7 @@ export class PdfEngine implements ReaderEngine {
     return this.#doc?.numPages ?? 0
   }
 
-  async open(container: HTMLElement, file: File, { location, settings, theme }: OpenOptions) {
+  async open(container: HTMLElement, file: File, { location, settings, theme, view }: OpenOptions) {
     this.#stage = document.createElement('div')
     this.#stage.className = 'pdf-stage'
     this.#sheet = document.createElement('div')
@@ -53,6 +55,9 @@ export class PdfEngine implements ReaderEngine {
     this.#index = Math.min(Math.max(0, (Number.isFinite(page) ? page : 1) - 1), this.#count - 1)
     this.#settings = settings
     this.#theme = theme
+    this.#view = view
+    const first = (await this.#page(1)).getViewport({ scale: 1 })
+    this.#aspect = first.width / first.height
     this.#applyTheme()
     this.#toc = await this.#buildToc().catch(() => [])
 
@@ -64,13 +69,15 @@ export class PdfEngine implements ReaderEngine {
     await this.#render()
   }
 
-  apply(settings: ComfortSettings, theme: ThemeColors) {
+  apply(settings: ComfortSettings, theme: ThemeColors, view: ViewOptions) {
     const prev = this.#settings
+    const prevBook = this.#view.bookMode
     this.#settings = settings
     this.#theme = theme
+    this.#view = view
     if (!this.#stage) return
     this.#applyTheme()
-    if (prev && (prev.spread !== settings.spread || prev.pdfFit !== settings.pdfFit)) this.#render()
+    if (prev && (prev.spread !== settings.spread || prev.pdfFit !== settings.pdfFit || prevBook !== view.bookMode)) this.#render()
   }
 
   async next() {
@@ -104,6 +111,37 @@ export class PdfEngine implements ReaderEngine {
     return this.#toc
   }
 
+  position() {
+    return this.#doc ? String(this.#start(this.#index)) : null
+  }
+
+  pageAspect() {
+    return this.#aspect
+  }
+
+  async snapshot(): Promise<Snapshot | null> {
+    if (this.#settings.pdfFit === 'width') return null
+    const canvases = [...this.#sheet.querySelectorAll('canvas')]
+    if (!canvases.length) return null
+    return {
+      columns: canvases.map(canvas => {
+        // copia inmediata: el lienzo original se reemplaza al cambiar de página
+        const copy = document.createElement('canvas')
+        copy.width = canvas.width
+        copy.height = canvas.height
+        copy.getContext('2d')?.drawImage(canvas, 0, 0)
+        copy.className = 'pdf-snap'
+        Object.assign(copy.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' })
+        return {
+          rect: canvas.getBoundingClientRect(),
+          async mount(container: HTMLElement) {
+            container.append(copy)
+          },
+        }
+      }),
+    }
+  }
+
   destroy() {
     this.#token++
     for (const t of this.#tasks) t.cancel()
@@ -119,6 +157,7 @@ export class PdfEngine implements ReaderEngine {
 
   get #spread() {
     const s = this.#settings
+    if (this.#view.bookMode) return this.#count > 1
     return (
       s.spread !== 'single' &&
       s.pdfFit === 'page' &&
@@ -152,6 +191,7 @@ export class PdfEngine implements ReaderEngine {
     this.#stage.style.background = this.#theme.bg
     this.#stage.dataset.dark = String(this.#theme.dark)
     this.#stage.dataset.fit = this.#settings.pdfFit
+    this.#stage.dataset.book = String(this.#view.bookMode)
   }
 
   async #render() {
@@ -164,14 +204,16 @@ export class PdfEngine implements ReaderEngine {
     const pages = await Promise.all(visible.map(i => this.#page(i + 1)))
     if (token !== this.#token) return
 
-    const fitWidth = this.#settings.pdfFit === 'width'
+    const book = this.#view.bookMode
+    const fitWidth = this.#settings.pdfFit === 'width' && !book
     const narrow = this.#stage.clientWidth < 600
-    const padX = fitWidth ? 0 : narrow ? 6 : 28
-    const padY = fitWidth ? 0 : narrow ? 10 : 24
+    // en modo libro las páginas llenan su mitad del libro abierto
+    const padX = fitWidth || book ? 0 : narrow ? 6 : 28
+    const padY = fitWidth || book ? 0 : narrow ? 10 : 24
     const availW = Math.max(100, this.#stage.clientWidth - padX * 2)
     const availH = Math.max(100, this.#stage.clientHeight - padY * 2)
     const base = pages.map(p => p.getViewport({ scale: 1 }))
-    const totalW = base.reduce((sum, v) => sum + v.width, 0)
+    const totalW = book ? base[0].width * 2 : base.reduce((sum, v) => sum + v.width, 0)
     const maxH = Math.max(...base.map(v => v.height))
     const scale = fitWidth ? availW / base[0].width : Math.min(availW / totalW, availH / maxH)
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5)
@@ -200,15 +242,17 @@ export class PdfEngine implements ReaderEngine {
     }
     if (token !== this.#token) return
 
-    this.#sheet.replaceChildren(
-      ...canvases.map((canvas, k) => {
-        const wrap = document.createElement('div')
-        wrap.className = 'pdf-page'
-        if (visible.length === 2) wrap.dataset.side = k === 0 ? 'left' : 'right'
-        wrap.append(canvas)
-        return wrap
-      }),
-    )
+    const wraps = canvases.map((canvas, k) => {
+      const wrap = document.createElement('div')
+      wrap.className = 'pdf-page'
+      // como en un libro impreso: la portada (página 1) a la derecha, las pares a la izquierda
+      if (book) wrap.dataset.side = visible[k] % 2 === 1 ? 'left' : 'right'
+      else if (visible.length === 2) wrap.dataset.side = k === 0 ? 'left' : 'right'
+      wrap.append(canvas)
+      return wrap
+    })
+    this.#sheet.dataset.book = String(book)
+    this.#sheet.replaceChildren(...wraps)
     if (fitWidth) this.#stage.scrollTop = 0
     this.#emit(visible)
   }
@@ -273,8 +317,7 @@ export class PdfEngine implements ReaderEngine {
       const dy = e.clientY - s.y
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5 && performance.now() - s.t < 600) {
         this.#swipedAt = performance.now()
-        if (dx < 0) this.next()
-        else this.prev()
+        this.#cb.onSwipe(dx < 0 ? 1 : -1)
       }
     })
   }

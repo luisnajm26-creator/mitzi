@@ -36,6 +36,106 @@
   height: 100%;
 }
 
+/* ---------- libro abierto (PC y tablet en horizontal) ---------- */
+.reader[data-book='true'] {
+  background: radial-gradient(ellipse 75% 70% at 50% 45%, var(--desk-a), var(--desk-b));
+}
+
+.reader[data-book='true'] .reader-stage {
+  z-index: 1;
+}
+
+.book-base > div,
+.book-gutter {
+  position: absolute;
+  pointer-events: none;
+}
+
+.book-board {
+  border-radius: 10px;
+  box-shadow:
+    0 30px 60px rgba(0, 0, 0, 0.45),
+    0 8px 18px rgba(0, 0, 0, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.book-gutter {
+  z-index: 3;
+  mix-blend-mode: multiply;
+}
+
+/* ---------- hoja que gira al pasar página ---------- */
+.turn-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.turn-scene {
+  position: absolute;
+  inset: 0;
+  perspective: 2400px;
+}
+
+.turn-cast,
+.turn-leaf,
+.turn-face,
+.turn-slot {
+  position: absolute;
+}
+
+.turn-cast {
+  opacity: 0;
+}
+
+.turn-leaf {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.turn-face {
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  isolation: isolate;
+}
+
+.turn-leaf .turn-face {
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.12);
+}
+
+.turn-face.back {
+  transform: rotateY(180deg);
+}
+
+.turn-content {
+  position: absolute;
+  inset: 0;
+}
+
+.turn-shade {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.32), rgba(0, 0, 0, 0.06) 70%, rgba(0, 0, 0, 0.12));
+}
+
+.page-snap {
+  color-scheme: normal;
+}
+
+/* las capturas de PDF toman el color del tema igual que las páginas */
+.turn-layer[data-dark='false'] .pdf-snap {
+  mix-blend-mode: multiply;
+}
+
+.turn-layer[data-dark='true'] .pdf-snap {
+  filter: invert(1) hue-rotate(180deg) brightness(0.88);
+  mix-blend-mode: screen;
+}
+
 /* ---------- PDF ---------- */
 .pdf-stage {
   width: 100%;
@@ -64,6 +164,33 @@
 
 .pdf-page canvas {
   display: block;
+}
+
+/* modo libro: cada página en su mitad, la portada a la derecha */
+.pdf-stage[data-book='true'] {
+  overflow: hidden;
+}
+
+.pdf-sheet[data-book='true'] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+}
+
+.pdf-sheet[data-book='true'] .pdf-page {
+  box-shadow: none;
+}
+
+.pdf-sheet[data-book='true'] .pdf-page[data-side='left'] {
+  grid-column: 1;
+  justify-self: end;
+}
+
+.pdf-sheet[data-book='true'] .pdf-page[data-side='right'] {
+  grid-column: 2;
+  justify-self: start;
 }
 
 /* la hoja blanca del PDF toma el color del tema; en oscuros se invierte suave */

@@ -128,12 +128,17 @@ export function ComfortPanel({ bookId, format, onClose }: Props) {
           label="Pantallas anchas"
           value={s.spread}
           options={[
-            { value: 'auto', label: 'Dos páginas' },
+            { value: 'auto', label: 'Libro abierto' },
             { value: 'single', label: 'Una página' },
           ]}
           onChange={v => set({ spread: v })}
         />
-        {epub && <Toggle label="Animación al pasar página" checked={s.animatePages} onChange={v => set({ animatePages: v })} />}
+        <Toggle
+          label="Animación al pasar página"
+          hint="La hoja gira sobre el lomo, como un libro de papel"
+          checked={s.animatePages}
+          onChange={v => set({ animatePages: v })}
+        />
       </Section>
 
       <Section title="Comodidad">

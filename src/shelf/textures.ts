@@ -172,43 +172,118 @@ function canvasTexture(canvas: HTMLCanvasElement, anisotropy: number) {
   return texture
 }
 
-export interface BookMaterials {
+/** Primera página (portadilla): papel crema con el título, como la de un libro impreso. */
+function firstPageCanvas(book: BookRecord, aspect: number) {
+  const w = 640
+  const h = Math.round(w / aspect)
+  const [canvas, ctx] = makeCanvas(w, h)
+  ctx.fillStyle = '#f6f1e6'
+  ctx.fillRect(0, 0, w, h)
+  // sombra suave cerca del lomo
+  const gutter = ctx.createLinearGradient(0, 0, w * 0.18, 0)
+  gutter.addColorStop(0, 'rgba(80, 60, 30, 0.22)')
+  gutter.addColorStop(1, 'rgba(80, 60, 30, 0)')
+  ctx.fillStyle = gutter
+  ctx.fillRect(0, 0, w * 0.18, h)
+  ctx.fillStyle = '#3b342b'
+  ctx.textAlign = 'center'
+  ctx.font = `600 46px ${TITLE_FONT}`
+  const lines = wrapLines(ctx, book.title, w - 160, 4)
+  lines.forEach((line, i) => ctx.fillText(line, w / 2, h * 0.34 + i * 56))
+  ctx.fillStyle = book.palette.primary
+  ctx.fillRect(w / 2 - 40, h * 0.34 + lines.length * 56 - 10, 80, 3)
+  if (book.author) {
+    ctx.fillStyle = '#6b6152'
+    ctx.font = `500 26px ${UI_FONT}`
+    ctx.fillText(ellipsize(ctx, book.author, w - 160), w / 2, h * 0.34 + lines.length * 56 + 40)
+  }
+  ctx.fillStyle = '#9a8f7e'
+  ctx.font = `600 20px ${UI_FONT}`
+  ctx.fillText('MITZI', w / 2, h * 0.92)
+  return canvas
+}
+
+/** Guardas: el papel de color del interior de la tapa. */
+function endpaperCanvas(book: BookRecord) {
+  const [canvas, ctx] = makeCanvas(256, 256)
+  ctx.fillStyle = mix(book.palette.light, book.palette.primary, 0.3)
+  ctx.fillRect(0, 0, 256, 256)
+  ctx.fillStyle = mix(book.palette.light, book.palette.primary, 0.48)
+  for (let y = 0; y < 256; y += 32)
+    for (let x = (y / 32) % 2 ? 16 : 0; x < 256; x += 32) {
+      ctx.beginPath()
+      ctx.arc(x + 8, y + 8, 3, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  return canvas
+}
+
+export interface BookPart {
+  geometry: THREE.BoxGeometry
+  /** BoxGeometry: [+x, -x, +y, -y, +z, -z] */
   materials: THREE.Material[]
-  /** Se resuelve cuando la portada real ya está cargada. */
+  position: [number, number, number]
+}
+
+/**
+ * Libro de tapa dura por piezas: la tapa gira sobre el lomo para abrirse.
+ * `pivot` es la bisagra (borde del lomo, al frente); la tapa se dibuja relativa a ella.
+ */
+export interface BookModel {
+  cover: BookPart
+  pivot: [number, number, number]
+  spine: BookPart
+  back: BookPart
+  block: BookPart
   ready: Promise<void>
   dispose(): void
 }
 
-/** Materiales en el orden de BoxGeometry: [+x canto, -x lomo, +y arriba, -y abajo, +z portada, -z contraportada]. */
-export function createBookMaterials(book: BookRecord, dims: BookDims, anisotropy: number): BookMaterials {
+export function createBookModel(book: BookRecord, dims: BookDims, anisotropy: number): BookModel {
   const { edgeSide, edgeTop } = getShared()
+  const { width: w, height: h, depth: d } = dims
+  const t = Math.min(0.026, d * 0.14) // grosor de las tapas
   const owned: THREE.Texture[] = []
+  const tex = (canvas: HTMLCanvasElement) => {
+    const texture = canvasTexture(canvas, anisotropy)
+    owned.push(texture)
+    return texture
+  }
 
-  const placeholder = canvasTexture(generatedCover(book, dims.width / dims.height), anisotropy)
-  owned.push(placeholder)
-  const cover = new THREE.MeshPhysicalMaterial({
-    map: placeholder,
-    roughness: 0.48,
-    clearcoat: 0.6,
-    clearcoatRoughness: 0.28,
-  })
-
-  const spineTex = canvasTexture(spineCanvas(book, dims), anisotropy)
-  owned.push(spineTex)
-  const spine = new THREE.MeshStandardMaterial({ map: spineTex, roughness: 0.55 })
-  const back = new THREE.MeshStandardMaterial({ color: mix(book.palette.primary, book.palette.dark, 0.45), roughness: 0.6 })
+  const placeholder = tex(generatedCover(book, w / h))
+  const coverMat = new THREE.MeshPhysicalMaterial({ map: placeholder, roughness: 0.48, clearcoat: 0.6, clearcoatRoughness: 0.28 })
+  const spineTex = tex(spineCanvas(book, dims))
+  const spineMat = new THREE.MeshStandardMaterial({ map: spineTex, roughness: 0.55 })
+  const board = new THREE.MeshStandardMaterial({ color: mix(book.palette.primary, book.palette.dark, 0.45), roughness: 0.6 })
+  const endpaperTex = tex(endpaperCanvas(book))
+  const endpaper = new THREE.MeshStandardMaterial({ map: endpaperTex, roughness: 0.9 })
+  const pageTex = tex(firstPageCanvas(book, w / h))
+  const page = new THREE.MeshStandardMaterial({ map: pageTex, roughness: 0.92 })
+  const paper = new THREE.MeshStandardMaterial({ color: '#f1eadb', roughness: 0.95 })
   const side = new THREE.MeshStandardMaterial({ map: edgeSide, roughness: 0.95 })
   const top = new THREE.MeshStandardMaterial({ map: edgeTop, roughness: 0.95 })
 
+  const blockW = w - t - 0.018
+  const blockH = h - 0.05
+  const blockD = Math.max(0.01, d - 2 * t)
+  const geometries = [
+    new THREE.BoxGeometry(w, h, t),
+    new THREE.BoxGeometry(t, h, d),
+    new THREE.BoxGeometry(w, h, t),
+    new THREE.BoxGeometry(blockW, blockH, blockD),
+  ]
+
   let disposed = false
   const ready = (async () => {
-    // con las fuentes cargadas, el lomo y la portada generada se redibujan bien
+    // con las fuentes cargadas, el lomo y las páginas se redibujan bien
     await document.fonts.ready
     if (disposed) return
     spineTex.image = spineCanvas(book, dims)
     spineTex.needsUpdate = true
+    pageTex.image = firstPageCanvas(book, w / h)
+    pageTex.needsUpdate = true
     if (!book.cover) {
-      placeholder.image = generatedCover(book, dims.width / dims.height)
+      placeholder.image = generatedCover(book, w / h)
       placeholder.needsUpdate = true
       return
     }
@@ -218,21 +293,28 @@ export function createBookMaterials(book: BookRecord, dims: BookDims, anisotropy
       const scale = Math.min(1, MAX_COVER_PX / img.naturalHeight)
       const [canvas, ctx] = makeCanvas(Math.round(img.naturalWidth * scale), Math.round(img.naturalHeight * scale))
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-      const texture = canvasTexture(canvas, anisotropy)
-      owned.push(texture)
-      cover.map = texture
+      coverMat.map = tex(canvas)
     } catch {
       // portada dañada: se queda la generada
     }
   })()
 
   return {
-    materials: [side, spine, top, top, cover, back],
+    pivot: [-w / 2, 0, d / 2 - t / 2],
+    cover: { geometry: geometries[0], materials: [board, board, board, board, coverMat, endpaper], position: [w / 2, 0, 0] },
+    spine: { geometry: geometries[1], materials: [board, spineMat, board, board, board, board], position: [-w / 2 + t / 2, 0, 0] },
+    back: { geometry: geometries[2], materials: [board, board, board, board, endpaper, board], position: [0, 0, -d / 2 + t / 2] },
+    block: {
+      geometry: geometries[3],
+      materials: [side, paper, top, top, page, paper],
+      position: [-w / 2 + t + blockW / 2, 0, 0],
+    },
     ready,
     dispose() {
       disposed = true
       for (const t of owned) t.dispose()
-      for (const m of [cover, spine, back, side, top]) m.dispose()
+      for (const g of geometries) g.dispose()
+      for (const m of [coverMat, spineMat, board, endpaper, page, paper, side, top]) m.dispose()
     },
   }
 }

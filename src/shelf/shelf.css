@@ -213,6 +213,18 @@
   right: 24px;
 }
 
+/* al abrir un libro, la interfaz se aparta y queda solo el libro */
+.shelf-top,
+.shelf-info,
+.shelf-arrow {
+  transition: opacity 260ms ease;
+}
+
+.shelf[data-opening='true'] :is(.shelf-top, .shelf-info, .shelf-arrow) {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .shelf-curtain {
   position: absolute;
   inset: 0;

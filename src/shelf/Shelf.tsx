@@ -40,15 +40,10 @@ export function Shelf({ active }: { active: boolean }) {
   const open = (index: number) => {
     const target = books[index]
     if (!target || opening) return
+    motion.ctrl.jumpTo(index)
     motion.openingAt = performance.now()
+    motion.wake?.()
     setOpening(true)
-    const start = performance.now()
-    const fade = () => {
-      const t = Math.min(1, (performance.now() - start) / OPEN_MS)
-      motion.intensity.current = 1 - t
-      if (t < 1) requestAnimationFrame(fade)
-    }
-    requestAnimationFrame(fade)
     db.books.update(target.id, { lastOpenedAt: Date.now() })
     setTimeout(() => openBook(target.id), OPEN_MS)
   }
@@ -73,7 +68,7 @@ export function Shelf({ active }: { active: boolean }) {
   const percent = p ? Math.round(p.fraction * 100) : 0
 
   return (
-    <section className="shelf" data-active={active} aria-hidden={!active}>
+    <section className="shelf" data-active={active} data-opening={opening} aria-hidden={!active}>
       <AmbientBackground palette={book?.palette ?? null} />
       {books.length > 0 && (
         <Shelf3D
@@ -149,7 +144,16 @@ export function Shelf({ active }: { active: boolean }) {
         </div>
       )}
       {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}
-      <div className="shelf-curtain" data-on={opening} style={{ background: curtainColor }} />
+      <div
+        className="shelf-curtain"
+        data-on={opening}
+        style={{
+          background: curtainColor,
+          // la cortina cae justo cuando la cámara entra a la primera página
+          transitionDelay: opening ? `${OPEN_MS * 0.74}ms` : '0ms',
+          transitionDuration: opening ? `${OPEN_MS * 0.26}ms` : '0ms',
+        }}
+      />
     </section>
   )
 }

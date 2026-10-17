@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { mix } from '../lib/color'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
 import { refreshLibrary } from '../library/store'
@@ -8,7 +9,9 @@ import { ComfortPanel } from './ComfortPanel'
 import { effectiveSettings, effectiveTheme, useReaderSettings } from './comfort/settings'
 import { EpubEngine } from './engines/epubEngine'
 import { PdfEngine } from './engines/pdfEngine'
-import type { EngineCallbacks, ReaderEngine, ReaderLocation, TocEntry } from './engines/types'
+import type { EngineCallbacks, ReaderEngine, ReaderLocation, TocEntry, ViewOptions } from './engines/types'
+import { computeBookGeometry, OpenBookBase, OpenBookGutter } from './layouts/OpenBook'
+import { PageTurner } from './pageTurn/PageTurner'
 import { TocPanel } from './TocPanel'
 import './reader.css'
 
@@ -24,8 +27,13 @@ export default function Reader({ bookId }: { bookId: string }) {
   // `clock` cambia cada minuto para que el modo noche se active a su hora
   const theme = useMemo(() => effectiveTheme({ global, perBook }, bookId, new Date()), [global, perBook, bookId, clock])
 
+  const rootRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
+  const turnLayerRef = useRef<HTMLDivElement>(null)
+  const turnerRef = useRef<PageTurner | null>(null)
   const engineRef = useRef<ReaderEngine | null>(null)
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
+  const [pageAspect, setPageAspect] = useState(0.66)
   const [book, setBook] = useState<BookRecord | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loc, setLoc] = useState<ReaderLocation | null>(null)
@@ -38,8 +46,19 @@ export default function Reader({ bookId }: { bookId: string }) {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const wheel = useRef({ acc: 0, lockUntil: 0 })
-  const latest = useRef({ settings, theme, panel })
-  latest.current = { settings, theme, panel }
+
+  // libro abierto de dos páginas en pantallas horizontales (si se lee por páginas)
+  const bookGeo = useMemo(
+    () =>
+      book && settings.flow === 'paginated' && settings.spread === 'auto' && (book.format === 'epub' || settings.pdfFit === 'page')
+        ? computeBookGeometry(size.w, size.h, pageAspect, book.pages)
+        : null,
+    [book, settings.flow, settings.spread, settings.pdfFit, size.w, size.h, pageAspect],
+  )
+  const view = useMemo<ViewOptions>(() => ({ bookMode: !!bookGeo, pageWidth: bookGeo?.pageWidth ?? 0 }), [bookGeo])
+
+  const latest = useRef({ settings, theme, panel, view })
+  latest.current = { settings, theme, panel, view }
 
   const saveNow = useCallback(async () => {
     const l = pending.current
@@ -54,6 +73,21 @@ export default function Reader({ bookId }: { bookId: string }) {
     await refreshLibrary()
     closeBook()
   }, [saveNow, closeBook])
+
+  /** Pasa de página, con la hoja que gira si la animación está activada. */
+  const turn = useCallback((dir: 1 | -1) => {
+    const engine = engineRef.current
+    const stage = stageRef.current
+    if (!engine || !stage) return
+    const { settings: s, theme: t, view: v } = latest.current
+    const paged = engine.format === 'pdf' || s.flow === 'paginated'
+    if (!s.animatePages || !paged || !turnerRef.current) {
+      if (dir > 0) engine.next()
+      else engine.prev()
+      return
+    }
+    turnerRef.current.turn(engine, dir, { book: v.bookMode, pages: stage.getBoundingClientRect(), bg: t.bg, dark: t.dark })
+  }, [])
 
   // acciones que llaman los motores; leen siempre el estado más reciente
   const actions = useRef({
@@ -71,17 +105,16 @@ export default function Reader({ bookId }: { bookId: string }) {
       const w = window.innerWidth
       const paged = latest.current.settings.flow === 'paginated' || engine?.format === 'pdf'
       if (paged && x < w * 0.28) {
-        engine?.prev()
+        turn(-1)
         setChrome(false)
       } else if (paged && x > w * 0.72) {
-        engine?.next()
+        turn(1)
         setChrome(false)
       } else setChrome(c => !c)
     },
     key(e) {
-      const engine = engineRef.current
-      if (['ArrowRight', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) engine?.next()
-      else if (['ArrowLeft', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)) engine?.prev()
+      if (['ArrowRight', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) turn(1)
+      else if (['ArrowLeft', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)) turn(-1)
       else if (e.key === 'Escape') {
         if (latest.current.panel) setPanel(null)
         else back()
@@ -94,8 +127,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       const now = performance.now()
       w.acc += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX
       if (now < w.lockUntil || Math.abs(w.acc) < 50) return
-      if (w.acc > 0) engineRef.current?.next()
-      else engineRef.current?.prev()
+      turn(w.acc > 0 ? 1 : -1)
       w.acc = 0
       w.lockUntil = now + 280
     },
@@ -115,6 +147,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       onTap: x => actions.current.tap(x),
       onKey: e => actions.current.key(e),
       onWheel: e => actions.current.wheel(e),
+      onSwipe: dir => turn(dir),
     }
     ;(async () => {
       try {
@@ -129,8 +162,10 @@ export default function Reader({ bookId }: { bookId: string }) {
           location: progress?.location,
           settings: latest.current.settings,
           theme: latest.current.theme,
+          view: latest.current.view,
         })
         if (cancelled) return
+        setPageAspect(engine.pageAspect())
         setToc(engine.toc())
         setStatus('ready')
         hideTimer.current = setTimeout(() => setChrome(false), 2200)
@@ -144,14 +179,28 @@ export default function Reader({ bookId }: { bookId: string }) {
       clearTimeout(saveTimer.current)
       clearTimeout(hideTimer.current)
       saveNow()
+      turnerRef.current?.cancel()
       engine?.destroy()
       engineRef.current = null
     }
-  }, [bookId, saveNow])
+  }, [bookId, saveNow, turn])
 
   useEffect(() => {
-    engineRef.current?.apply(settings, theme)
-  }, [settings, theme])
+    engineRef.current?.apply(settings, theme, view)
+  }, [settings, theme, view])
+
+  // tamaño del lector, para decidir si se muestra como libro abierto
+  useLayoutEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    const ro = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect
+      setSize(prev => (prev.w === width && prev.h === height ? prev : { w: width, h: height }))
+    })
+    ro.observe(root)
+    turnerRef.current = turnLayerRef.current ? new PageTurner(turnLayerRef.current) : null
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!settings.keepAwake) return
@@ -197,7 +246,9 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   const fraction = scrub ?? loc?.fraction ?? 0
   const percent = Math.round(fraction * 100)
-  const commitScrub = () => {
+  const commitScrub = (e: { currentTarget: HTMLInputElement; type: string }) => {
+    // al soltar, la barra suelta el foco: así las flechas vuelven a pasar página
+    if (e.type === 'pointerup') e.currentTarget.blur()
     if (scrub === null) return
     engineRef.current?.goToFraction(scrub)
     setScrub(null)
@@ -211,13 +262,23 @@ export default function Reader({ bookId }: { bookId: string }) {
     '--r-border': theme.border,
     '--r-link': theme.link,
     '--r-fill': `${fraction * 100}%`,
+    ...(book && {
+      '--desk-a': mix(book.palette.dark, theme.dark ? '#000000' : theme.bg, theme.dark ? 0.35 : 0.12),
+      '--desk-b': mix(book.palette.dark, '#000000', 0.55),
+    }),
   } as CSSProperties
+  const stageStyle: CSSProperties | undefined = bookGeo
+    ? { left: bookGeo.left, top: bookGeo.top, width: bookGeo.width, height: bookGeo.height, right: 'auto', bottom: 'auto', padding: 0 }
+    : undefined
 
   const showChrome = chrome || panel !== null || status !== 'ready'
 
   return (
-    <div className="reader" data-dark={theme.dark} data-chrome={showChrome} data-leaving={leaving} style={vars}>
-      <div className="reader-stage" ref={stageRef} />
+    <div ref={rootRef} className="reader" data-dark={theme.dark} data-chrome={showChrome} data-leaving={leaving} data-book={!!bookGeo} style={vars}>
+      {bookGeo && book && <OpenBookBase geo={bookGeo} progress={fraction} palette={book.palette} theme={theme} />}
+      <div className="reader-stage" ref={stageRef} style={stageStyle} />
+      <div className="turn-layer" ref={turnLayerRef} aria-hidden />
+      {bookGeo && <OpenBookGutter geo={bookGeo} progress={fraction} />}
 
       {status === 'loading' && (
         <div className="reader-status">
