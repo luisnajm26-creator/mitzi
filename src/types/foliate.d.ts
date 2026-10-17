@@ -16,6 +16,9 @@ declare module 'foliate-js/view.js' {
     size?: number
     linear?: string
     cfi?: string
+    createDocument?(): Promise<Document>
+    /** ruta de un recurso (imagen, estilo…) relativa a esta sección, dentro del libro */
+    resolveHref?(href: string): string
   }
 
   export interface FoliateBook {
@@ -30,6 +33,7 @@ declare module 'foliate-js/view.js' {
     dir?: string
     rendition?: { layout?: string }
     getCover?(): Promise<Blob | null>
+    loadBlob?(path: string): Promise<Blob>
   }
 
   export interface RelocateDetail {

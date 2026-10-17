@@ -80,17 +80,38 @@
   z-index: 4;
 }
 
+/* cada hoja: caja de la página › recorte por la línea del doblez › contenido.
+   Durante el giro solo cambian transformaciones: la GPU compone sin repintar */
 .flip-slot {
   position: absolute;
   overflow: hidden;
-  isolation: isolate;
   transform-origin: 0 0;
-  will-change: transform, clip-path;
+  will-change: transform;
 }
 
-/* una sola página: el reverso deja ver el texto al trasluz */
-.flip-slot[data-faint='true'] > * {
-  opacity: 0.1;
+.flip-clip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.flip-content {
+  position: absolute;
+  left: 0;
+  top: 0;
+  isolation: isolate;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* reverso de la hoja cuando se lee de a una página */
+.flip-paper {
+  position: absolute;
+  inset: 0;
+  background: var(--r-bg);
 }
 
 .ghost-win {
@@ -106,11 +127,6 @@
   pointer-events: none;
 }
 
-.flip-shadow {
-  position: absolute;
-  inset: 0;
-}
-
 /* sombra del lomo sobre la hoja que cae: se mezcla igual que la del libro */
 .flip-crease {
   position: absolute;
@@ -121,22 +137,24 @@
   mix-blend-mode: normal;
 }
 
+/* sombras a lo largo del doblez: empiezan en la línea y se alejan de ella */
 .flip-bar {
   position: absolute;
   left: 0;
   top: 0;
   transform-origin: 0 0;
+  will-change: transform, opacity;
 }
 
 /* sombra que la hoja levantada proyecta sobre la página que aparece */
-.flip-under .flip-bar {
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.12) 35%, rgba(0, 0, 0, 0));
+.flip-bar.cast {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.12) 35%, rgba(0, 0, 0, 0));
 }
 
 /* curvatura del papel en la parte doblada: sombra en el pliegue y un brillo suave */
-.flip-over .flip-bar {
+.flip-bar.shade {
   background: linear-gradient(
-    to bottom,
+    to right,
     rgba(0, 0, 0, 0.26) 0%,
     rgba(0, 0, 0, 0.06) 4%,
     rgba(255, 255, 255, 0.12) 9%,
@@ -146,9 +164,9 @@
   );
 }
 
-.flip-over .flip-shadow[data-dark='true'] .flip-bar {
+.flip-bar.shade[data-dark='true'] {
   background: linear-gradient(
-    to bottom,
+    to right,
     rgba(0, 0, 0, 0.5) 0%,
     rgba(0, 0, 0, 0.12) 5%,
     rgba(255, 255, 255, 0.06) 10%,

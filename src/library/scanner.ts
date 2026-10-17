@@ -2,7 +2,7 @@ import { sha256 } from '@noble/hashes/sha2.js'
 import { platform } from '../platform'
 import type { BookFile, ScanResult } from '../platform/types'
 import { db, type BookRecord } from './db'
-import { extractBook, formatOf } from './metadata'
+import { extractBook, findEpubCover, formatOf } from './metadata'
 import { seriesKeyOf } from './series'
 import { refreshLibrary, useLibrary } from './store'
 
@@ -134,6 +134,31 @@ async function syncOnce() {
     for (const [id, path] of present) await db.books.update(id, { missing: false, path })
   }
   await refreshLibrary()
+  await fillMissingCovers()
+}
+
+/** Versión de la búsqueda de portadas: al mejorarla, los libros sin portada se revisan otra vez. */
+const COVER_TRY = 1
+
+/** Libros que se importaron sin portada: se busca otra vez con la búsqueda nueva, sin apuro. */
+async function fillMissingCovers() {
+  const pending = await db.books.filter(b => !b.hasCover && !b.missing && b.format === 'epub' && (b.coverTry ?? 0) < COVER_TRY).toArray()
+  let found = false
+  for (const book of pending) {
+    try {
+      const blob = await withTimeout(platform.readBlob(book.path), FILE_TIMEOUT, book.fileName)
+      const cover = await withTimeout(findEpubCover(new File([blob], book.fileName)), FILE_TIMEOUT, book.fileName)
+      if (cover) {
+        await db.covers.put({ id: book.id, blob: cover.blob })
+        await db.books.update(book.id, { hasCover: true, coverAspect: cover.aspect, palette: cover.palette ?? book.palette, coverTry: COVER_TRY })
+        found = true
+      } else await db.books.update(book.id, { coverTry: COVER_TRY })
+    } catch (e) {
+      console.warn('No se pudo buscar la portada', book.fileName, e)
+    }
+    await pause(30)
+  }
+  if (found) await refreshLibrary()
 }
 
 async function importFile(file: BookFile): Promise<string> {
@@ -157,6 +182,7 @@ async function importFile(file: BookFile): Promise<string> {
     addedAt: Date.now(),
     ...meta,
     hasCover: !!cover,
+    coverTry: COVER_TRY,
     seriesKey: meta.series ? seriesKeyOf(meta.series) : undefined,
   }
   // la portada se guarda aparte: la lista de libros queda liviana aunque haya miles

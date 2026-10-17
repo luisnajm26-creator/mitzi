@@ -1,4 +1,4 @@
-import type { Contributor, LanguageMap } from 'foliate-js/view.js'
+import type { Contributor, FoliateBook, LanguageMap } from 'foliate-js/view.js'
 import { loadPdfjs, pdfAssetOptions } from '../reader/engines/pdfjs'
 import type { BookFormat } from './db'
 import { paletteFromImage, paletteFromSeed, type Palette } from './palette'
@@ -61,7 +61,7 @@ async function extractEpub(file: File): Promise<ExtractedBook> {
   const language = Array.isArray(md.language) ? md.language[0] : md.language
   const bytes = book.sections.reduce((sum, s) => sum + (s.linear !== 'no' ? (s.size ?? 0) : 0), 0)
   const pages = Math.max(8, Math.min(4000, Math.round(bytes / BYTES_PER_PAGE)))
-  const coverBlob = await book.getCover?.().catch(() => null)
+  const coverBlob = (await book.getCover?.().catch(() => null)) ?? (await firstPageImage(book).catch(() => null))
   const cover = coverBlob ? await processCover(coverBlob) : null
   return {
     title,
@@ -73,6 +73,22 @@ async function extractEpub(file: File): Promise<ExtractedBook> {
     palette: cover?.palette ?? paletteFromSeed(title + author),
     ...seriesOf(title, md.belongsTo),
   }
+}
+
+/**
+ * Muchos EPUB no declaran su portada, pero la ponen como imagen en la primera página
+ * (cover.xhtml, Portada.xhtml…). Se usa esa imagen si la página casi no tiene texto.
+ */
+export async function firstPageImage(book: FoliateBook): Promise<Blob | null> {
+  for (const section of book.sections.slice(0, 2)) {
+    const doc = await section.createDocument?.()
+    if (!doc || !section.resolveHref || !book.loadBlob) continue
+    if ((doc.body?.textContent?.trim().length ?? 0) > 200) continue
+    const img = doc.querySelector('img[src], image')
+    const src = img?.getAttribute('src') ?? img?.getAttribute('href') ?? img?.getAttributeNS('http://www.w3.org/1999/xlink', 'href')
+    if (src) return book.loadBlob(section.resolveHref(src))
+  }
+  return null
 }
 
 async function extractPdf(file: File): Promise<ExtractedBook> {
@@ -108,6 +124,14 @@ async function extractPdf(file: File): Promise<ExtractedBook> {
   } finally {
     await task.destroy()
   }
+}
+
+/** Vuelve a buscar la portada de un EPUB ya importado (con la búsqueda en la primera página). */
+export async function findEpubCover(file: File) {
+  const { makeBook } = await import('foliate-js/view.js')
+  const book = await makeBook(file)
+  const blob = (await book.getCover?.().catch(() => null)) ?? (await firstPageImage(book).catch(() => null))
+  return blob ? processCover(blob) : null
 }
 
 /** Reduce la portada a un tamaño manejable y extrae su paleta. */

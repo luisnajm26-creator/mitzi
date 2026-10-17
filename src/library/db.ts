@@ -18,6 +18,8 @@ export interface BookRecord {
   pages: number
   /** La portada está guardada aparte (tabla covers) para que la lista de libros pese poco. */
   hasCover?: boolean
+  /** veces que se buscó la portada con un método mejor (para no repetirlo) */
+  coverTry?: number
   /** ancho / alto de la portada */
   coverAspect: number
   /** Serie (de los datos del libro o deducida del título) y número de tomo. */

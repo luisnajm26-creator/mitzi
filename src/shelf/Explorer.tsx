@@ -2,7 +2,10 @@ import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'reac
 import { db, type BookRecord } from '../library/db'
 import { filterBooks, groupBooks, statusOf, useLibraryQuery, type CarouselFilter, type GroupBy, type SortBy, type StatusFilter } from '../library/query'
 import { useLibrary } from '../library/store'
+import { handleBack, useBackHandler } from '../app/back'
+import { isDark, mix } from '../lib/color'
 import { Icon } from '../ui/Icon'
+import { Picker } from '../ui/Picker'
 import './explorer.css'
 
 /** Un solo observador para todas las portadas: se cargan cuando entran en pantalla. */
@@ -47,13 +50,31 @@ function useCoverUrl(book: BookRecord, ref: RefObject<HTMLElement | null>) {
   return url
 }
 
+/** Portada dibujada con los colores del libro, para los que no traen una (como en el carrusel). */
+function GeneratedCover({ book }: { book: BookRecord }) {
+  const { primary, secondary, dark } = book.palette
+  return (
+    <span
+      className="tile-generated"
+      style={{
+        background: `linear-gradient(155deg, ${primary}, ${mix(secondary, dark, 0.35)})`,
+        color: isDark(primary) ? '#fbf7ef' : '#1d1a22',
+      }}
+    >
+      <span className="tile-generated-title">{book.title}</span>
+      <span className="tile-generated-rule" />
+      {book.author && <span className="tile-generated-author">{book.author}</span>}
+    </span>
+  )
+}
+
 const Tile = memo(function Tile({ book, fraction, showVolume, onPick }: { book: BookRecord; fraction: number; showVolume: boolean; onPick(id: string): void }) {
   const ref = useRef<HTMLButtonElement>(null)
   const url = useCoverUrl(book, ref)
   return (
     <button ref={ref} className="tile" onClick={() => onPick(book.id)} title={book.title}>
-      <span className="tile-cover" style={{ background: `linear-gradient(160deg, ${book.palette.primary}, ${book.palette.dark})` }}>
-        {url ? <img src={url} alt="" draggable={false} /> : <span className="tile-fallback">{book.title}</span>}
+      <span className="tile-cover" style={{ background: book.palette.dark }}>
+        {url ? <img src={url} alt="" draggable={false} /> : !book.hasCover && <GeneratedCover book={book} />}
         {showVolume && book.seriesIndex !== undefined && <span className="tile-volume">{book.seriesIndex}</span>}
         {fraction > 0.005 && (
           <span className="tile-progress">
@@ -74,6 +95,25 @@ const STATUS: { id: StatusFilter; label: string }[] = [
   { id: 'terminados', label: 'Terminados' },
 ]
 
+const GROUPS: { value: GroupBy; label: string }[] = [
+  { value: 'serie', label: 'Por serie' },
+  { value: 'autor', label: 'Por autor' },
+  { value: 'ninguno', label: 'Sin agrupar' },
+]
+
+const SORTS: { value: SortBy; label: string }[] = [
+  { value: 'recientes', label: 'Leídos recientemente' },
+  { value: 'titulo', label: 'Título' },
+  { value: 'autor', label: 'Autor' },
+  { value: 'agregados', label: 'Agregados recientemente' },
+]
+
+const FORMATS: { value: 'todos' | 'epub' | 'pdf'; label: string }[] = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'epub', label: 'EPUB' },
+  { value: 'pdf', label: 'PDF' },
+]
+
 interface Props {
   onClose(): void
   /** Lleva el carrusel a este libro. */
@@ -89,12 +129,14 @@ export function Explorer({ onClose, onPick, onShowGroup }: Props) {
   const query = useLibraryQuery(s => s.query)
   const setQuery = useLibraryQuery(s => s.setQuery)
   const input = useRef<HTMLInputElement>(null)
+  // el gesto atrás (o Esc) cierra primero un menú abierto y luego el explorador
+  useBackHandler(true, onClose)
 
   useEffect(() => {
     // en teléfonos el teclado tapa media pantalla: solo se enfoca solo en PC
     if (matchMedia('(pointer: fine)').matches) input.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') handleBack()
       e.stopPropagation()
     }
     window.addEventListener('keydown', onKey, true)
@@ -142,32 +184,10 @@ export function Explorer({ onClose, onPick, onShowGroup }: Props) {
             </button>
           ))}
         </div>
-        <div className="explorer-selects">
-          <label>
-            Formato
-            <select value={query.format} onChange={e => setQuery({ format: e.target.value as typeof query.format })}>
-              <option value="todos">Todos</option>
-              <option value="epub">EPUB</option>
-              <option value="pdf">PDF</option>
-            </select>
-          </label>
-          <label>
-            Agrupar
-            <select value={query.group} onChange={e => setQuery({ group: e.target.value as GroupBy })}>
-              <option value="serie">Por serie</option>
-              <option value="autor">Por autor</option>
-              <option value="ninguno">Sin agrupar</option>
-            </select>
-          </label>
-          <label>
-            Ordenar
-            <select value={query.sort} onChange={e => setQuery({ sort: e.target.value as SortBy })}>
-              <option value="recientes">Leídos recientemente</option>
-              <option value="titulo">Título</option>
-              <option value="autor">Autor</option>
-              <option value="agregados">Agregados recientemente</option>
-            </select>
-          </label>
+        <div className="explorer-pickers">
+          <Picker label="Agrupar" icon="layers" value={query.group} options={GROUPS} onChange={group => setQuery({ group })} />
+          <Picker label="Ordenar" icon="sort" value={query.sort} options={SORTS} onChange={sort => setQuery({ sort })} />
+          <Picker label="Formato" icon="file" value={query.format} options={FORMATS} onChange={format => setQuery({ format })} />
         </div>
       </div>
 

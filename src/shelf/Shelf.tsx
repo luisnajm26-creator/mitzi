@@ -10,6 +10,8 @@ import { Explorer } from './Explorer'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
 import { AmbientBackground } from './AmbientBackground'
 import { CLOSE_MS, createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
+import { useBackHandler } from '../app/back'
+import { hideSplashAfterPaint } from '../app/splash'
 import { Icon } from '../ui/Icon'
 import './shelf.css'
 
@@ -24,6 +26,10 @@ export function Shelf({ active }: { active: boolean }) {
   const pendingPick = useRef<string | null>(null)
   const progress = useLibrary(s => s.progress)
   const loaded = useLibrary(s => s.loaded)
+  // biblioteca vacía: no hay libro que esperar para quitar la pantalla de inicio
+  useEffect(() => {
+    if (loaded && allBooks.length === 0) hideSplashAfterPaint()
+  }, [loaded, allBooks.length])
   const scanning = useLibrary(s => s.scanning)
   const failed = useLibrary(s => s.failed)
   const [failedOpen, setFailedOpen] = useState(false)
@@ -308,6 +314,7 @@ function EmptyState({ onFolders }: { onFolders(): void }) {
 /** Qué libros fallaron y por qué: para reportarlo o reintentar. */
 function FailedPanel({ onClose }: { onClose(): void }) {
   const failed = useLibrary(s => s.failed)
+  useBackHandler(true, onClose)
   const engine = navigator.userAgent.match(/Chrome\/(\d+)/)?.[1]
   return (
     <div className="sheet-backdrop" onClick={onClose}>
@@ -346,6 +353,7 @@ function FailedPanel({ onClose }: { onClose(): void }) {
 
 function FoldersPanel({ onClose }: { onClose(): void }) {
   const [folders, reload] = useFolders()
+  useBackHandler(true, onClose)
   return (
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={e => e.stopPropagation()} role="dialog" aria-label="Carpetas de libros">

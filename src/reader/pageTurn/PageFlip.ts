@@ -1,5 +1,5 @@
 import type { PageSide, ReaderEngine } from '../engines/types'
-import { apply, compose, computeFold, IDENTITY, toCssMatrix, toCssPolygon, translate, type Mat, type Poly, type Pt } from './geometry'
+import { apply, compose, computeFold, IDENTITY, toCssMatrix, translate, type Mat, type Pt } from './geometry'
 
 export interface FlipContext {
   /** Libro abierto (dos páginas) o una sola página. */
@@ -28,6 +28,10 @@ interface Setup {
   backFromLocal: Mat
   restB: DOMRect
   restC: DOMRect
+  /** lado del recorte (un cuadrado que siempre cubre la página) */
+  cut: number
+  /** largo de las sombras a lo largo del doblez (cubre cualquier corte de la página) */
+  diag: number
 }
 
 type Mode = 'idle' | 'preparing' | 'auto' | 'drag' | 'settle'
@@ -35,6 +39,8 @@ type Mode = 'idle' | 'preparing' | 'auto' | 'drag' | 'settle'
 const MIRROR: Mat = { a: -1, b: 0, c: 0, d: 1, e: 0, f: 0 }
 const easeInOut = (x: number) => (x < 0.5 ? 4 * x * x * x : 1 - (-2 * x + 2) ** 3 / 2)
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+const linear = (m: Mat): Mat => ({ ...m, e: 0, f: 0 })
+const dot = (a: Pt, b: Pt) => a.x * b.x + a.y * b.y
 
 function el(className: string, parent: HTMLElement) {
   const e = document.createElement('div')
@@ -43,28 +49,76 @@ function el(className: string, parent: HTMLElement) {
   return e
 }
 
-function place(e: HTMLElement, r: DOMRect) {
+function setRect(e: HTMLElement, r: DOMRect) {
   Object.assign(e.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` })
+}
+
+/**
+ * Una hoja: su caja (la página; en el reverso, reflejada sobre el doblez) › el recorte
+ * por la línea del doblez › el contenido, devuelto a su lugar. El motor pinta en
+ * `content`. En cada cuadro solo cambian transformaciones, que la GPU compone sin
+ * repintar nada: así el giro va igual de fluido a 60 o a 120 Hz, también en el teléfono.
+ */
+interface Sheet {
+  box: HTMLElement
+  clip: HTMLElement
+  content: HTMLElement
+}
+
+function sheet(parent: HTMLElement): Sheet {
+  const box = el('flip-slot', parent)
+  const clip = el('flip-clip', box)
+  const content = el('flip-content', clip)
+  return { box, clip, content }
+}
+
+function place(sh: Sheet, r: DOMRect) {
+  setRect(sh.box, r)
+  Object.assign(sh.content.style, { width: `${r.width}px`, height: `${r.height}px` })
+}
+
+/** Inversa de una rotación con traslación. */
+const invertRigid = (m: Mat): Mat => ({ a: m.a, b: m.c, c: m.b, d: m.d, e: -(m.a * m.e + m.b * m.f), f: -(m.c * m.e + m.d * m.f) })
+
+/**
+ * Recorta por un semiplano solo con transformaciones: `clip` es un cuadrado de lado
+ * `size` con un borde sobre la línea que pasa por `m` (normal `u`, hacia lo que se
+ * conserva) y `content` se contrarrota para quedar quieto. Devuelve a qué altura del
+ * recorte queda `center` proyectado sobre la línea (para alinear las sombras).
+ */
+function cutAlong(clip: HTMLElement, content: HTMLElement | null, m: Pt, u: Pt, size: number, center: Pt) {
+  const v = { x: -u.y, y: u.x }
+  const W: Mat = { a: u.x, b: u.y, c: v.x, d: v.y, e: m.x - (size / 2) * v.x, f: m.y - (size / 2) * v.y }
+  clip.style.transform = toCssMatrix(W)
+  if (content) content.style.transform = toCssMatrix(invertRigid(W))
+  return dot({ x: center.x - m.x, y: center.y - m.y }, v) + size / 2
+}
+
+/** Sin recorte: el cuadrado del recorte cubre toda la página. */
+function uncut(sh: Sheet) {
+  sh.clip.style.transform = 'none'
+  sh.content.style.transform = 'none'
 }
 
 /**
  * La hoja que gira al pasar página. Se dibuja con copias exactas de las páginas
  * (mismo texto, mismos cortes de línea): la parte plana, la parte doblada con su
  * reverso y las sombras. Por debajo el libro ya cambió de página, así que al
- * terminar no hay ningún salto. Solo cambian recortes y transformaciones: la GPU
- * lo compone sin volver a maquetar el texto, a 60 o 120 Hz.
+ * terminar no hay ningún salto.
  */
 export class PageFlip {
   readonly slots: HTMLElement[]
   #under: HTMLElement
   #over: HTMLElement
-  #A: HTMLElement
-  #B: HTMLElement
-  #C: HTMLElement
+  #A: Sheet
+  #B: Sheet
+  #C: Sheet
   #crease: HTMLElement
-  #cast: HTMLElement
+  /** reverso liso de la hoja cuando se lee de a una página */
+  #paper: HTMLElement
+  #castBox: HTMLElement
+  #castClip: HTMLElement
   #castBar: HTMLElement
-  #shade: HTMLElement
   #shadeBar: HTMLElement
 
   #mode: Mode = 'idle'
@@ -88,21 +142,28 @@ export class PageFlip {
     this.#over = over
     under.replaceChildren()
     over.replaceChildren()
-    this.#A = el('flip-slot', under)
-    this.#B = el('flip-slot', under)
-    this.#cast = el('flip-shadow', under)
-    this.#castBar = el('flip-bar', this.#cast)
-    this.#C = el('flip-slot', over)
+    this.#A = sheet(under)
+    this.#B = sheet(under)
+    this.#castBox = el('flip-slot', under)
+    this.#castClip = el('flip-clip', this.#castBox)
+    this.#castBar = el('flip-bar cast', this.#castClip)
+    this.#C = sheet(over)
+    this.#shadeBar = el('flip-bar shade', this.#C.clip)
     this.#crease = document.createElement('div')
     this.#crease.className = 'flip-crease'
-    this.#shade = el('flip-shadow', over)
-    this.#shadeBar = el('flip-bar', this.#shade)
-    this.slots = [this.#A, this.#B, this.#C]
+    this.#paper = document.createElement('div')
+    this.#paper.className = 'flip-paper'
+    this.slots = [this.#A.content, this.#B.content, this.#C.content]
     this.#hide()
   }
 
   get busy() {
     return this.#mode !== 'idle'
+  }
+
+  /** Las copias que conviene tener listas: con una sola página el reverso es papel liso. */
+  slotsFor(book: boolean) {
+    return book ? [this.#B.content, this.#A.content, this.#C.content] : [this.#B.content, this.#A.content]
   }
 
   /** Pasa de página con la hoja que se dobla y cae del otro lado. */
@@ -207,30 +268,30 @@ export class PageFlip {
     const end = { x: -w, y: cornerY }
 
     const A = this.#A, B = this.#B, C = this.#C
-    for (const s of this.slots) s.removeAttribute('data-faint')
     this.#crease.remove() // se vuelve a poner con la página que llega (solo en el libro abierto)
     try {
       // lo que se ve ahora, copiado antes de cambiar de página
       if (!reverse) {
         place(B, turningRect)
-        await engine.paintPage(B, turningSide, turningRect)
+        await engine.paintPage(B.content, turningSide, turningRect)
         if (book) {
           place(A, otherRect)
-          A.hidden = !(await engine.paintPage(A, otherSide, otherRect))
+          A.box.hidden = !(await engine.paintPage(A.content, otherSide, otherRect))
         } else {
-          A.hidden = true
-          // una sola página: el reverso deja ver el texto al trasluz
+          A.box.hidden = true
+          // una sola página: el reverso es papel (sin otra copia del capítulo que maquetar)
           place(C, turningRect)
-          await engine.paintPage(C, 'single', turningRect)
-          C.dataset.faint = 'true'
+          C.content.replaceChildren(this.#paper)
         }
       } else {
         place(A, stage)
-        A.hidden = !(await engine.paintPage(A, 'single', stage))
+        A.box.hidden = !(await engine.paintPage(A.content, 'single', stage))
       }
-      for (const s of [B, C]) Object.assign(s.style, { clipPath: '', transform: '' })
-      B.hidden = reverse
-      C.style.visibility = 'hidden'
+      uncut(B)
+      C.box.style.transform = ''
+      B.box.hidden = reverse
+      C.box.style.visibility = 'hidden'
+      this.#castBox.style.visibility = 'hidden'
       this.#under.style.visibility = 'visible'
 
       const from = engine.position()
@@ -243,22 +304,23 @@ export class PageFlip {
       // lo que llega
       if (book) {
         place(C, otherRect)
-        const ok = await engine.paintPage(C, otherSide, otherRect)
+        const ok = await engine.paintPage(C.content, otherSide, otherRect)
         if (ok) this.#attachCrease(ctx.gutter, ctx.dark, otherRect)
-        else C.replaceChildren()
+        else C.content.replaceChildren()
       } else if (reverse) {
         place(B, stage)
-        B.hidden = false
-        await engine.paintPage(B, 'single', stage)
+        B.box.hidden = false
+        await engine.paintPage(B.content, 'single', stage)
         place(C, stage)
-        await engine.paintPage(C, 'single', stage)
-        C.dataset.faint = 'true'
+        C.content.replaceChildren(this.#paper)
       }
     } catch (e) {
       this.#hide()
       throw e
     }
 
+    const restB = reverse ? stage : turningRect
+    const diag = Math.hypot(w, h)
     this.#setup = {
       engine,
       dir,
@@ -272,9 +334,18 @@ export class PageFlip {
       toScreen,
       toLocal,
       backFromLocal: book ? MIRROR : IDENTITY,
-      restB: reverse ? stage : turningRect,
+      restB,
       restC: book ? otherRect : turningRect,
+      cut: 3 * diag,
+      diag: diag + 4,
     }
+    // tamaños fijos durante el giro: luego solo cambian transformaciones y opacidades
+    for (const clip of [B.clip, C.clip, this.#castClip]) Object.assign(clip.style, { width: `${3 * diag}px`, height: `${3 * diag}px` })
+    setRect(this.#castBox, restB)
+    Object.assign(this.#castBar.style, { width: `${16 + w * 0.4}px`, height: `${diag + 4}px` })
+    Object.assign(this.#shadeBar.style, { width: `${w}px`, height: `${diag + 4}px` })
+    this.#shadeBar.dataset.dark = String(ctx.dark)
+
     this.#t = reverse ? { ...end } : { ...corner }
     this.#v = { x: 0, y: 0 }
     this.#render()
@@ -358,7 +429,7 @@ export class PageFlip {
     this.#under.style.visibility = 'hidden'
     this.#over.style.visibility = 'hidden'
     // los hijos heredan la visibilidad de su capa: así nada queda dibujado en reposo
-    for (const e of [...this.slots, this.#cast, this.#shade]) Object.assign(e.style, { clipPath: '', transform: '', visibility: '' })
+    for (const e of [this.#A.box, this.#B.box, this.#C.box, this.#castBox]) Object.assign(e.style, { transform: '', visibility: '' })
   }
 
   /**
@@ -380,7 +451,7 @@ export class PageFlip {
       background: gutter.style.background,
     })
     this.#crease.dataset.dark = String(dark)
-    this.#C.append(this.#crease)
+    this.#C.content.append(this.#crease)
   }
 
   // ---------- dibujo de cada cuadro ----------
@@ -388,48 +459,50 @@ export class PageFlip {
   #render() {
     const s = this.#setup!
     const fold = computeFold(s.corner, this.#t, s.w, s.h)
-    const toScr = (p: Pt) => apply(s.toScreen, p)
-    const rel = (poly: Poly, r: DOMRect) => toCssPolygon(poly.map(p => ({ x: p.x - r.left, y: p.y - r.top })))
-
-    this.#B.style.clipPath = rel(fold.flatPart.map(toScr), s.restB)
+    const B = this.#B, C = this.#C
     if (fold.flat) {
-      this.#C.style.visibility = 'hidden'
-      this.#cast.style.visibility = 'hidden'
-      this.#shade.style.visibility = 'hidden'
+      uncut(B)
+      C.box.style.visibility = 'hidden'
+      this.#castBox.style.visibility = 'hidden'
       return
     }
 
-    // reverso: contenido en su lugar de reposo → reflejado sobre la línea del doblez
+    // la línea del doblez en la pantalla, con su normal hacia la esquina que se levanta
+    const mid = apply(s.toScreen, fold.mid)
+    const n = apply(linear(s.toScreen), fold.normal)
+    const rB = s.restB
+    const mB = { x: mid.x - rB.left, y: mid.y - rB.top }
+    const centerB = { x: rB.width / 2, y: rB.height / 2 }
+    // la parte plana es lo que queda del lado del lomo
+    cutAlong(B.clip, B.content, mB, { x: -n.x, y: -n.y }, s.cut, centerB)
+
+    // reverso: el contenido en su lugar de reposo, reflejado sobre la línea del doblez
     const S = compose(s.toScreen, compose(fold.reflect, compose(s.backFromLocal, s.toLocal)))
     const origin = { x: s.restC.left, y: s.restC.top }
     const moved = apply(S, origin)
-    this.#C.style.transform = toCssMatrix({ ...S, e: moved.x - origin.x, f: moved.y - origin.y })
-    this.#C.style.clipPath = rel(fold.foldedPart.map(p => toScr(apply(s.backFromLocal, p))), s.restC)
-    this.#C.style.visibility = ''
-
-    // sombras alineadas con el doblez
+    C.box.style.transform = toCssMatrix({ ...S, e: moved.x - origin.x, f: moved.y - origin.y })
+    const toC = compose(s.toScreen, s.backFromLocal)
+    const mC = apply(toC, fold.mid)
+    const shadeY = cutAlong(
+      C.clip,
+      C.content,
+      { x: mC.x - origin.x, y: mC.y - origin.y },
+      apply(linear(toC), fold.normal),
+      s.cut,
+      { x: s.restC.width / 2, y: s.restC.height / 2 },
+    )
     const lift = Math.sin(Math.PI * fold.progress)
-    const mid = toScr(fold.mid)
-    const lin = { ...s.toScreen, e: 0, f: 0 }
-    const n = apply(lin, fold.normal)
-    const span = 3 * Math.max(s.w, s.h)
-    const bar = (e: HTMLElement, vx: number, vy: number, depth: number) => {
-      const angle = Math.atan2(-vx, vy)
-      e.style.width = `${span}px`
-      e.style.height = `${depth}px`
-      e.style.transform = `translate(${mid.x}px, ${mid.y}px) rotate(${angle}rad) translate(${-span / 2}px, 0)`
-    }
-    // sobre la página que se descubre: sombra que proyecta la hoja levantada
-    this.#cast.style.clipPath = toCssPolygon(fold.foldedPart.map(toScr))
-    this.#cast.style.visibility = ''
-    bar(this.#castBar, n.x, n.y, 16 + s.w * 0.4 * lift)
+    // sobre la hoja doblada: sombra en el pliegue y brillo de la curvatura del papel
+    this.#shadeBar.style.transform = `translate(0, ${shadeY - s.diag / 2}px)`
     // las sombras y el brillo entran y salen suaves: nada se enciende o apaga de golpe
-    this.#castBar.style.opacity = String(lift)
-    // sobre la hoja doblada: brillo y sombra de la curvatura del papel
-    this.#shade.style.clipPath = toCssPolygon(fold.flap.map(toScr))
-    this.#shade.style.visibility = ''
-    bar(this.#shadeBar, -n.x, -n.y, s.w)
     this.#shadeBar.style.opacity = String(Math.min(1, lift * 1.8))
-    this.#shade.dataset.dark = String(s.dark)
+    C.box.style.visibility = ''
+
+    // sobre la página que se descubre: la sombra que proyecta la hoja levantada
+    const castY = cutAlong(this.#castClip, null, mB, n, s.cut, centerB)
+    const depth = 16 + s.w * 0.4 * lift
+    this.#castBar.style.transform = `translate(0, ${castY - s.diag / 2}px) scaleX(${depth / (16 + s.w * 0.4)})`
+    this.#castBar.style.opacity = String(lift)
+    this.#castBox.style.visibility = ''
   }
 }

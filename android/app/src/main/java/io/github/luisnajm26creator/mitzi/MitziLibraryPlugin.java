@@ -281,6 +281,7 @@ public class MitziLibraryPlugin extends Plugin {
                 Window window = getActivity().getWindow();
                 WindowManager.LayoutParams params = window.getAttributes();
                 int modeId = 0;
+                float rate = 0;
                 if (on) {
                     Display display = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                         ? getActivity().getDisplay()
@@ -293,10 +294,13 @@ public class MitziLibraryPlugin extends Plugin {
                             if (sameSize && m.getRefreshRate() > best.getRefreshRate()) best = m;
                         }
                         modeId = best.getModeId();
+                        rate = best.getRefreshRate();
                     }
                 }
-                if (params.preferredDisplayModeId != modeId) {
+                // el modo y la frecuencia: algunos teléfonos (p. ej. Huawei con LTPO) solo respetan uno de los dos
+                if (params.preferredDisplayModeId != modeId || params.preferredRefreshRate != rate) {
                     params.preferredDisplayModeId = modeId;
+                    params.preferredRefreshRate = rate;
                     window.setAttributes(params);
                 }
                 call.resolve();

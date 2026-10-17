@@ -7,6 +7,7 @@ import { ambientColors } from '../library/palette'
 import { CarouselController } from './carousel'
 import { LightRig } from './LightRig'
 import { BOOK_HEIGHT, bookDims, createBookModel, getShared } from './textures'
+import { hideSplashAfterPaint } from '../app/splash'
 
 /** Vueltas del libro central (radianes por segundo). */
 const SPIN_SPEED = 0.42
@@ -123,7 +124,11 @@ const Book = memo(function Book({ book, index, motion, layout, anisotropy, onTap
   const angle = useRef(0)
 
   useEffect(() => {
-    model.ready.then(() => invalidate())
+    model.ready.then(() => {
+      invalidate()
+      // el libro del centro ya tiene su portada: se puede quitar la pantalla de inicio
+      if (index === motion.ctrl.center) hideSplashAfterPaint()
+    })
     return () => model.dispose()
   }, [model, invalidate])
 

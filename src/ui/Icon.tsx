@@ -21,6 +21,10 @@ const paths = {
   stop: 'M6 6h12v12H6z',
   search: 'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM20 20l-4.8-4.8',
   grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
+  'chevron-down': 'M6 9l6 6 6-6',
+  sort: 'M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3',
+  layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
+  file: 'M6 3h8l4 4v14H6zM14 3v4h4',
 } as const
 
 export type IconName = keyof typeof paths

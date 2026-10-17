@@ -6,9 +6,144 @@
     <meta name="color-scheme" content="dark light" />
     <meta name="theme-color" content="#0d0b12" />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="preload" href="./fonts/literata-latin.woff2" as="font" type="font/woff2" crossorigin />
     <title>Mitzi</title>
+    <!-- pantalla de inicio: va aquí para verse desde el primer instante, antes de que cargue la app -->
+    <style>
+      @font-face {
+        font-family: 'Mitzi Splash';
+        src: url('./fonts/literata-latin.woff2') format('woff2');
+        font-weight: 200 900;
+        font-display: block;
+      }
+      html,
+      body {
+        margin: 0;
+        background: #0d0b12;
+      }
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 26px;
+        background: #0d0b12;
+        color: #f3eff8;
+        overflow: hidden;
+        transition: opacity 600ms ease;
+      }
+      #splash.out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-light {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: min(640px, 130vw);
+        height: 78%;
+        transform: translateX(-50%);
+        background: radial-gradient(ellipse 50% 100% at 50% 0%, rgba(214, 190, 255, 0.22), rgba(255, 228, 240, 0.06) 48%, transparent 76%);
+        opacity: 0;
+        animation: splash-fade 1400ms ease-out 80ms forwards;
+      }
+      .splash-word {
+        position: relative;
+        display: flex;
+        font-family: 'Mitzi Splash', Georgia, serif;
+        font-weight: 600;
+        font-size: clamp(60px, 17vw, 108px);
+        line-height: 1.1;
+        transition:
+          transform 600ms ease,
+          filter 600ms ease;
+      }
+      #splash.out .splash-word {
+        transform: scale(1.06);
+        filter: blur(6px);
+      }
+      /* cada letra sube y se enfoca, una tras otra; luego un brillo la recorre */
+      .splash-word span {
+        display: inline-block;
+        opacity: 0;
+        transform: translateY(42%) rotate(5deg);
+        filter: blur(10px);
+        color: transparent;
+        background: linear-gradient(100deg, #f3eff8 0%, #f3eff8 38%, #ffe3f1 50%, #f3eff8 62%, #f3eff8 100%);
+        background-size: 320% 100%;
+        background-position: 100% 0;
+        -webkit-background-clip: text;
+        background-clip: text;
+        animation:
+          splash-letter 780ms cubic-bezier(0.2, 0.8, 0.2, 1) calc(160ms + var(--i) * 90ms) forwards,
+          splash-shine 1000ms ease-in-out calc(950ms + var(--i) * 70ms) forwards;
+      }
+      .splash-line {
+        position: relative;
+        width: 128px;
+        height: 2px;
+        border-radius: 2px;
+        overflow: hidden;
+        background: rgba(243, 239, 248, 0.12);
+        transform: scaleX(0);
+        animation: splash-grow 640ms cubic-bezier(0.2, 0.8, 0.2, 1) 760ms forwards;
+      }
+      /* mientras carga: una luz corre por la línea */
+      .splash-line::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        width: 42%;
+        background: linear-gradient(90deg, transparent, rgba(255, 227, 241, 0.9), transparent);
+        transform: translateX(-100%);
+        animation: splash-load 1150ms ease-in-out 1400ms infinite;
+      }
+      @keyframes splash-letter {
+        to {
+          opacity: 1;
+          transform: none;
+          filter: blur(0);
+        }
+      }
+      @keyframes splash-shine {
+        to {
+          background-position: 0% 0;
+        }
+      }
+      @keyframes splash-fade {
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes splash-grow {
+        to {
+          transform: scaleX(1);
+        }
+      }
+      @keyframes splash-load {
+        to {
+          transform: translateX(240%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash *,
+        #splash *::after {
+          animation-duration: 1ms !important;
+          animation-delay: 0ms !important;
+          animation-iteration-count: 1 !important;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash" aria-hidden="true">
+      <div class="splash-light"></div>
+      <div class="splash-word"><span style="--i: 0">M</span><span style="--i: 1">i</span><span style="--i: 2">t</span><span style="--i: 3">z</span><span style="--i: 4">i</span></div>
+      <div class="splash-line"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

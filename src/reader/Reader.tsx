@@ -105,13 +105,17 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
   }
 
-  /** Frecuencia alta mientras se mueve la hoja; en reposo la pantalla vuelve a ahorrar. */
+  /**
+   * Frecuencia alta mientras se lee activamente; en reposo la pantalla vuelve a ahorrar.
+   * Se pide al tocar (antes de que empiece el giro: cambiar de 60 a 120 Hz a mitad de
+   * la animación la traba) y se mantiene unos segundos entre página y página.
+   */
   const boostRefresh = useCallback(() => {
     platform.setHighRefresh?.(true)
     clearTimeout(refreshTimer.current)
     refreshTimer.current = setTimeout(() => {
       if (!flipRef.current?.busy) platform.setHighRefresh?.(false)
-    }, 1500)
+    }, 4000)
   }, [])
 
   /** Pasa de página, con la hoja de papel si la animación está activada. */
@@ -139,6 +143,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (!engine || !flip || !stage || !latest.current.settings.animatePages || !engine.canFlip()) return false
     const g = gesture.current
     if (e.type === 'down') {
+      boostRefresh()
       if (latest.current.panel || flip.busy) return false
       const rel = (e.x - stage.left) / stage.width
       const zone = e.pointerType === 'mouse' ? (rel > 0.85 ? 1 : rel < 0.15 ? -1 : 0) : 2
@@ -357,7 +362,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (flipUnderRef.current && flipOverRef.current) {
       const flip = new PageFlip(flipUnderRef.current, flipOverRef.current)
       // tras cada giro, las copias del capítulo se preparan para el siguiente
-      flip.onFinish = () => engineRef.current?.prewarm(flip.slots)
+      flip.onFinish = () => engineRef.current?.prewarm(flip.slotsFor(latest.current.view.bookMode))
       flipRef.current = flip
     }
     return () => ro.disconnect()
@@ -395,7 +400,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (status !== 'ready' || !settings.animatePages) return
     const id = setTimeout(() => {
       const flip = flipRef.current
-      if (flip && !flip.busy) engineRef.current?.prewarm(flip.slots)
+      if (flip && !flip.busy) engineRef.current?.prewarm(flip.slotsFor(latest.current.view.bookMode))
     }, 700)
     return () => clearTimeout(id)
   }, [loc, status, settings, theme, view, annotations])
