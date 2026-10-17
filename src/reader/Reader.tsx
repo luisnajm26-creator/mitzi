@@ -97,7 +97,12 @@ export default function Reader({ bookId }: { bookId: string }) {
   const flipContext = (): FlipContext | null => {
     const stage = stageRef.current
     if (!stage) return null
-    return { book: latest.current.view.bookMode, stage: stage.getBoundingClientRect(), dark: latest.current.theme.dark }
+    return {
+      book: latest.current.view.bookMode,
+      stage: stage.getBoundingClientRect(),
+      dark: latest.current.theme.dark,
+      gutter: rootRef.current?.querySelector<HTMLElement>('.book-gutter'),
+    }
   }
 
   /** Frecuencia alta mientras se mueve la hoja; en reposo la pantalla vuelve a ahorrar. */

@@ -111,6 +111,16 @@
   inset: 0;
 }
 
+/* sombra del lomo sobre la hoja que cae: se mezcla igual que la del libro */
+.flip-crease {
+  position: absolute;
+  mix-blend-mode: multiply;
+}
+
+.flip-crease[data-dark='true'] {
+  mix-blend-mode: normal;
+}
+
 .flip-bar {
   position: absolute;
   left: 0;

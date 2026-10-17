@@ -29,13 +29,14 @@ Si algo de esto falla, dime también en qué número se quedó el contador y si 
 | # | Haz esto | Debe pasar |
 |---|---|---|
 | 12 | Con fondo **Blanco** o **Crema**, pasa varias páginas con → | Sin destello blanco al empezar ni al terminar el giro; la sombra de la hoja aparece y se va suave |
-| 13 | Lo mismo con fondo **Negro** o **Noche** | Sin destello blanco ni franjas claras |
-| 14 | Arrastra la hoja despacio con el ratón y suéltala | Sin destello al tomarla ni al soltarla |
-| 15 | Haz clic (o toca) en el centro del libro varias veces | Las barras de arriba y abajo aparecen y se van con un fundido suave; sin destello negro |
+| 13 | Mira el centro del libro cuando la hoja cae del otro lado (con → y con ←) | La hoja se oscurece junto al lomo mientras cae y se une al libro; el centro no se aclara ni cambia de golpe al terminar |
+| 14 | Lo mismo con fondo **Negro** o **Noche** | Sin destello blanco ni franjas claras |
+| 15 | Arrastra la hoja despacio con el ratón y suéltala | Sin destello al tomarla ni al soltarla |
+| 16 | Haz clic (o toca) en el centro del libro varias veces | Las barras de arriba y abajo aparecen y se van con un fundido suave; sin destello negro |
 
 ## Bordes del libro 3D
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 16 | En la biblioteca, mira el libro del centro dar una vuelta completa | El lomo y las esquinas se ven limpios: sin franja con ruido ni parpadeo donde el lomo se une con las tapas |
-| 17 | Mira los libros de los lados al cambiar de libro | Igual de limpios |
+| 17 | En la biblioteca, mira el libro del centro dar una vuelta completa | El lomo y las esquinas se ven limpios: sin franja con ruido ni parpadeo donde el lomo se une con las tapas |
+| 18 | Mira los libros de los lados al cambiar de libro | Igual de limpios |

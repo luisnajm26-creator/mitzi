@@ -7,6 +7,8 @@ export interface FlipContext {
   /** Rectángulo de las páginas en la ventana. */
   stage: DOMRect
   dark: boolean
+  /** Sombra del lomo del libro abierto: la hoja la toma al caer sobre la otra página. */
+  gutter?: HTMLElement | null
 }
 
 interface Setup {
@@ -26,6 +28,8 @@ interface Setup {
   backFromLocal: Mat
   restB: DOMRect
   restC: DOMRect
+  /** dónde está la sombra del lomo (null si no hay libro abierto) */
+  crease: DOMRect | null
 }
 
 type Mode = 'idle' | 'preparing' | 'auto' | 'drag' | 'settle'
@@ -59,6 +63,7 @@ export class PageFlip {
   #A: HTMLElement
   #B: HTMLElement
   #C: HTMLElement
+  #crease: HTMLElement
   #cast: HTMLElement
   #castBar: HTMLElement
   #shade: HTMLElement
@@ -90,6 +95,7 @@ export class PageFlip {
     this.#cast = el('flip-shadow', under)
     this.#castBar = el('flip-bar', this.#cast)
     this.#C = el('flip-slot', over)
+    this.#crease = el('flip-crease', over)
     this.#shade = el('flip-shadow', over)
     this.#shadeBar = el('flip-bar', this.#shade)
     this.slots = [this.#A, this.#B, this.#C]
@@ -267,6 +273,7 @@ export class PageFlip {
       backFromLocal: book ? MIRROR : IDENTITY,
       restB: reverse ? stage : turningRect,
       restC: book ? otherRect : turningRect,
+      crease: this.#placeCrease(book ? ctx.gutter : null, ctx.dark),
     }
     this.#t = reverse ? { ...end } : { ...corner }
     this.#v = { x: 0, y: 0 }
@@ -351,7 +358,17 @@ export class PageFlip {
     this.#under.style.visibility = 'hidden'
     this.#over.style.visibility = 'hidden'
     // los hijos heredan la visibilidad de su capa: así nada queda dibujado en reposo
-    for (const e of [...this.slots, this.#cast, this.#shade]) Object.assign(e.style, { clipPath: '', transform: '', visibility: '' })
+    for (const e of [...this.slots, this.#crease, this.#cast, this.#shade]) Object.assign(e.style, { clipPath: '', transform: '', visibility: '' })
+  }
+
+  /** Copia la sombra del lomo (mismo degradado y lugar) sobre la hoja que gira. */
+  #placeCrease(gutter: HTMLElement | null | undefined, dark: boolean): DOMRect | null {
+    if (!gutter) return null
+    const r = gutter.getBoundingClientRect()
+    place(this.#crease, r)
+    this.#crease.style.background = gutter.style.background
+    this.#crease.dataset.dark = String(dark)
+    return r
   }
 
   // ---------- dibujo de cada cuadro ----------
@@ -365,6 +382,7 @@ export class PageFlip {
     this.#B.style.clipPath = rel(fold.flatPart.map(toScr), s.restB)
     if (fold.flat) {
       this.#C.style.visibility = 'hidden'
+      this.#crease.style.visibility = 'hidden'
       this.#cast.style.visibility = 'hidden'
       this.#shade.style.visibility = 'hidden'
       return
@@ -377,6 +395,15 @@ export class PageFlip {
     this.#C.style.transform = toCssMatrix({ ...S, e: moved.x - origin.x, f: moved.y - origin.y })
     this.#C.style.clipPath = rel(fold.foldedPart.map(p => toScr(apply(s.backFromLocal, p))), s.restC)
     this.#C.style.visibility = ''
+
+    // al caer sobre la otra página, la hoja se hunde en el lomo y toma su misma sombra:
+    // así, al terminar, la sombra del libro ya estaba ahí y nada se enciende de golpe
+    if (s.crease) {
+      const land = clamp01((fold.progress - 0.5) / 0.5)
+      this.#crease.style.clipPath = rel(fold.flap.map(toScr), s.crease)
+      this.#crease.style.opacity = String(land * land * (3 - 2 * land))
+      this.#crease.style.visibility = ''
+    } else this.#crease.style.visibility = 'hidden'
 
     // sombras alineadas con el doblez
     const lift = Math.sin(Math.PI * fold.progress)
