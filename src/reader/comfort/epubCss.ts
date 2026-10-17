@@ -49,6 +49,7 @@ ${s.paragraphSpacing !== null ? `p { margin-top: 0 !important; margin-bottom: ${
 [align="justify"] { text-align: justify; }
 a:link, a:visited { color: ${t.link} !important; }
 ::selection { background: ${t.selection}; }
+::highlight(mitzi-tts) { background-color: ${t.highlights.azul}; }
 pre { white-space: pre-wrap !important; }
 hr { border-color: ${t.border} !important; }
 ${t.dark ? 'img, svg, image, video { filter: brightness(0.86) contrast(1.04); }' : ''}

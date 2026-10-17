@@ -33,6 +33,10 @@ export interface ComfortSettings {
   warmth: number
   animatePages: boolean
   keepAwake: boolean
+  /** velocidad de la lectura en voz alta */
+  ttsRate: number
+  /** voz elegida (null = la primera del idioma del libro) */
+  ttsVoice: string | null
 }
 
 export const DEFAULT_SETTINGS: ComfortSettings = {
@@ -57,6 +61,8 @@ export const DEFAULT_SETTINGS: ComfortSettings = {
   warmth: 0,
   animatePages: true,
   keepAwake: true,
+  ttsRate: 1,
+  ttsVoice: null,
 }
 
 interface ReaderSettingsState {

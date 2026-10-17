@@ -8,23 +8,22 @@ Tu biblioteca se muestra como el selector de un videojuego: el libro elegido gir
 
 ## Qué hace hoy
 
-- **Biblioteca que se llena sola**: vigila una carpeta (en PC, `Documentos\Mitzi Libros`) y muestra los libros que agregas o quitas, sin reiniciar. También puedes arrastrar libros a la ventana o elegir otras carpetas.
-- **Carrusel 3D**: el libro central gira bajo un haz de luz con polvo flotando; los demás esperan a los lados. Se maneja arrastrando, con la rueda, con las flechas o tocando un libro.
-- **Fondo con los colores del libro**: se extrae la paleta de cada portada y el ambiente cambia suavemente al pasar de un libro a otro.
-- **Lector de EPUB**: paginado o deslizando, dos páginas en pantallas anchas, índice, barra de avance y retoma donde te quedaste.
-- **Lector de PDF**: una o dos páginas, ajuste a la página o al ancho, y los mismos fondos de color.
-- **Lectura cómoda**: 17 fondos (claros, 7 pasteles y oscuros) más uno a tu gusto, texto con contraste calculado, 5 tipografías (incluida OpenDyslexic), tamaño, interlineado, márgenes, ancho de línea, brillo, filtro cálido, modo noche automático por horario y ajustes por libro.
+- **Biblioteca que se llena sola**: en PC vigila `Documentos\Mitzi Libros` y otras carpetas que elijas; en Android usas el selector de carpetas del sistema o "Abrir con Mitzi". Los libros aparecen y desaparecen sin reiniciar.
+- **Carrusel 3D**: el libro central gira bajo un haz de luz con polvo flotando; el fondo toma los colores de la portada. Se maneja arrastrando, con la rueda, con las flechas o tocando un libro.
+- **Abrir un libro**: el libro se pone de frente, la tapa gira sobre el lomo y la cámara entra a la primera página.
+- **Libro abierto** (PC y tablet en horizontal): tapa dura, dos páginas, sombra en el lomo y un bloque de hojas a cada lado que cambia con tu avance, como un libro de papel.
+- **Pasar página** con una hoja que gira sobre el lomo, en EPUB y PDF.
+- **Lectura cómoda**: 17 fondos (claros, 7 pasteles y oscuros) más uno a tu gusto, texto con contraste calculado, 5 tipografías (incluida OpenDyslexic), tamaño, interlineado, márgenes, brillo, filtro cálido, modo noche automático y ajustes por libro.
+- **Subrayados y notas** en 5 colores, con panel de notas y exportación a Markdown.
+- **Lectura en voz alta** con las voces del sistema: resalta la oración que lee, pasa de página sola y tiene temporizador para dormir.
+- **Android** (probado con Huawei EMUI, sin servicios de Google): pantalla completa, botón atrás y 120 Hz solo mientras hay animación.
 
 ## En camino
 
 | Fase | Qué trae |
 |---|---|
-| 4 | App de Android (probada en Huawei con EMUI, sin servicios de Google) |
-| 5 | Libro abierto a pantalla completa con relieve de hojas que cambia con el avance, y animación de pasar página |
-| 6 | Subrayados y notas |
-| 7 | Lectura en voz alta |
 | 8 | Sincronización entre PC y móvil (opcional, con tu propio Supabase gratuito) |
-| 9 | Instaladores (.exe y .apk) en cada Release |
+| 9 | Instaladores (.exe y .apk firmado) en cada Release |
 
 ## Fluidez y batería
 
@@ -56,6 +55,7 @@ npm run electron:dev  # app de PC
 | `npm run build` | Compila todo para producción |
 | `npm run electron` | Abre la app de PC con la versión compilada |
 | `npm run demo` | Genera libros de prueba con texto original |
+| `npm run android` | Compila el APK de Android en `release/` (necesita Java 21 y el Android SDK) |
 | `npm run typecheck` | Revisa los tipos de TypeScript |
 
 ### Estructura

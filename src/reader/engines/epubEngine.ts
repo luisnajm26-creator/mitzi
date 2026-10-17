@@ -5,6 +5,7 @@ import type { ThemeColors } from '../comfort/contrast'
 import { epubCss } from '../comfort/epubCss'
 import type { ComfortSettings } from '../comfort/settings'
 import { snapshotColumn, splitColumns } from '../pageTurn/epubSnapshot'
+import { createEpubSpeech } from '../tts/epubSpeech'
 import type { EngineCallbacks, OpenOptions, ReaderEngine, Snapshot, TocEntry, ViewOptions } from './types'
 
 const flattenToc = (items: TocItem[] | null | undefined, depth = 0): TocEntry[] =>
@@ -155,6 +156,10 @@ export class EpubEngine implements ReaderEngine {
         snapshotColumn(doc, range, { rect: new DOMRect(fr.left + x0 + k * width, fr.top, width, fr.height), padX: gap / 2 }),
       ),
     }
+  }
+
+  speech(lang?: string) {
+    return this.#view ? createEpubSpeech(this.#view, lang) : Promise.resolve(null)
   }
 
   setAnnotations(list: AnnotationRecord[], theme: ThemeColors) {

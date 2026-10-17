@@ -3,7 +3,7 @@ import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import type { ComfortSettings } from '../comfort/settings'
 import { loadPdfjs, pdfAssetOptions } from './pdfjs'
-import type { EngineCallbacks, OpenOptions, ReaderEngine, Snapshot, TocEntry, ViewOptions } from './types'
+import type { EngineCallbacks, OpenOptions, ReaderEngine, Snapshot, SpeechSource, TocEntry, ViewOptions } from './types'
 
 type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
 
@@ -151,6 +151,41 @@ export class PdfEngine implements ReaderEngine {
         }
       }),
     }
+  }
+
+  /** Lee las páginas visibles oración por oración y pasa de página al terminar. */
+  async speech(lang?: string): Promise<SpeechSource | null> {
+    if (!this.#doc) return null
+    let segmenter: Intl.Segmenter
+    try {
+      segmenter = new Intl.Segmenter(lang || undefined, { granularity: 'sentence' })
+    } catch {
+      // idioma con un código raro en los metadatos del PDF
+      segmenter = new Intl.Segmenter(undefined, { granularity: 'sentence' })
+    }
+    let queue: string[] = []
+    const load = async () => {
+      const texts = await Promise.all(
+        this.#visible().map(async i => {
+          const content = await (await this.#page(i + 1)).getTextContent()
+          return content.items.map(it => ('str' in it ? it.str + (it.hasEOL ? '\n' : '') : '')).join('')
+        }),
+      )
+      // une palabras cortadas con guion al final de línea
+      const full = texts.join('\n').replace(/-\n(\p{L})/gu, '$1').replace(/\s*\n\s*/g, ' ')
+      queue = [...segmenter.segment(full)].map(s => s.segment.trim()).filter(Boolean)
+    }
+    await load()
+    const next = async () => {
+      while (!queue.length) {
+        const before = this.position()
+        await this.next()
+        if (this.position() === before) return null
+        await load()
+      }
+      return { text: queue.shift()!, lang }
+    }
+    return { next, prev: next, stop() {} }
   }
 
   setAnnotations(list: AnnotationRecord[], theme: ThemeColors) {

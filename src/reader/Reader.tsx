@@ -13,6 +13,7 @@ import type { EngineCallbacks, ReaderEngine, ReaderLocation, TocEntry, ViewOptio
 import { computeBookGeometry, OpenBookBase, OpenBookGutter } from './layouts/OpenBook'
 import { PageTurner } from './pageTurn/PageTurner'
 import { TocPanel } from './TocPanel'
+import { ReadAloudBar, useReadAloud } from './tts/ReadAloud'
 import { AnnotationPopover, NoteEditor, NotesPanel, SelectionMenu } from './annotations/Annotations'
 import type { AnnotationRecord, HighlightColor } from '../library/db'
 import type { TextSelection } from './engines/types'
@@ -47,6 +48,15 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [tapped, setTapped] = useState<{ id: string; rect: DOMRect } | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
+  const [ttsOpen, setTtsOpen] = useState(false)
+  const tts = useReadAloud({
+    engine: useCallback(() => engineRef.current, []),
+    lang: book?.language,
+    rate: settings.ttsRate,
+    voice: settings.ttsVoice,
+  })
+  const setSetting = useReaderSettings(s => s.update)
+  const loadVoices = useCallback(() => tts.backend?.voices() ?? Promise.resolve([]), [tts.backend])
   const [scrub, setScrub] = useState<number | null>(null)
 
   const pending = useRef<ReaderLocation | null>(null)
@@ -284,13 +294,15 @@ export default function Reader({ bookId }: { bookId: string }) {
     return () => ro.disconnect()
   }, [])
 
+  // pantalla encendida: si lo pide el ajuste o mientras se lee en voz alta
+  const awake = settings.keepAwake || tts.state === 'playing'
   useEffect(() => {
-    if (!settings.keepAwake) return
+    if (!awake) return
     platform.keepAwake(true)
     return () => {
       platform.keepAwake(false)
     }
-  }, [settings.keepAwake])
+  }, [awake])
 
   // en Android se lee a pantalla completa, sin barras del sistema
   useEffect(() => {
@@ -394,6 +406,19 @@ export default function Reader({ bookId }: { bookId: string }) {
           {loc?.chapter && <span>{loc.chapter}</span>}
         </div>
         <div className="reader-tools">
+          {tts.available && (
+            <button
+              className="reader-icon"
+              onClick={() => {
+                setTtsOpen(true)
+                if (tts.state !== 'playing') tts.play()
+              }}
+              aria-label="Leer en voz alta"
+              title="Leer en voz alta"
+            >
+              <Icon name="speaker" />
+            </button>
+          )}
           <button className="reader-icon" onClick={() => setPanel(p => (p === 'notes' ? null : 'notes'))} aria-label="Subrayados y notas" title="Subrayados y notas">
             <Icon name="bookmark" />
           </button>
@@ -428,6 +453,26 @@ export default function Reader({ bookId }: { bookId: string }) {
       </footer>
       <div className="reader-mini-progress" aria-hidden />
 
+      {ttsOpen && tts.backend && (
+        <ReadAloudBar
+          state={tts.state}
+          rate={settings.ttsRate}
+          voice={settings.ttsVoice}
+          lang={book?.language}
+          sleepAt={tts.sleepAt}
+          voices={loadVoices}
+          onPlay={tts.play}
+          onPause={tts.pause}
+          onSkip={tts.skip}
+          onStop={() => {
+            tts.stop()
+            setTtsOpen(false)
+          }}
+          onRate={ttsRate => setSetting({ ttsRate }, bookId)}
+          onVoice={ttsVoice => setSetting({ ttsVoice }, bookId)}
+          onSleep={minutes => tts.setSleepAt(minutes ? Date.now() + minutes * 60_000 : null)}
+        />
+      )}
       {selection && (
         <SelectionMenu rect={selection.rect} text={selection.text} theme={theme} onHighlight={c => highlight(c)} onNote={() => highlight('amarillo', true)} />
       )}

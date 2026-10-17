@@ -70,6 +70,18 @@ export interface Snapshot {
   columns: SnapColumn[]
 }
 
+export interface SpeechSegment {
+  text: string
+  lang?: string
+}
+
+/** Lectura en voz alta: entrega el texto oración por oración, desde lo que se ve. */
+export interface SpeechSource {
+  next(): Promise<SpeechSegment | null>
+  prev(): Promise<SpeechSegment | null>
+  stop(): void
+}
+
 /** Lo mismo para EPUB y PDF: así la interfaz, el relieve, las notas y la voz no distinguen formato. */
 export interface ReaderEngine {
   readonly format: 'epub' | 'pdf'
@@ -89,5 +101,7 @@ export interface ReaderEngine {
   /** Dibuja los subrayados del libro (se llama de nuevo cuando cambian). */
   setAnnotations(list: AnnotationRecord[], theme: ThemeColors): void
   clearSelection(): void
+  /** Empieza a leer en voz alta desde la página visible. */
+  speech(lang?: string): Promise<SpeechSource | null>
   destroy(): void
 }

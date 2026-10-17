@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <!-- Capa frontal del ícono adaptable de Android: el contenido queda dentro de la zona segura (66 de 108) -->
+  <defs>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff6d8" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#fff6d8" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="book" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#c9b6ff"/>
+      <stop offset="1" stop-color="#ff9fc4"/>
+    </linearGradient>
+  </defs>
+  <path d="M49 22h10l15 54H34z" fill="url(#beam)" opacity=".55"/>
+  <rect x="41" y="40" width="26" height="36" rx="3" fill="url(#book)"/>
+  <rect x="41" y="40" width="5" height="36" rx="2" fill="#7d63c9"/>
+  <ellipse cx="54" cy="81" rx="17" ry="3" fill="#000" opacity=".45"/>
+</svg>

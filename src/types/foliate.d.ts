@@ -47,6 +47,8 @@ declare module 'foliate-js/view.js' {
     next(distance?: number): Promise<void>
     prev(distance?: number): Promise<void>
     getContents(): { index: number; doc: Document; overlayer?: unknown }[]
+    nextSection(): Promise<void>
+    scrollToAnchor(anchor: Range | Element | number, select?: boolean): Promise<void>
     readonly page: number
     readonly pages: number
     /** ancho visible del contenedor (px) */
@@ -65,6 +67,14 @@ declare module 'foliate-js/view.js' {
     addAnnotation(annotation: ViewAnnotation, remove?: boolean): Promise<{ index: number; label: string } | undefined>
     deleteAnnotation(annotation: ViewAnnotation): Promise<unknown>
     getCFI(index: number, range: Range): string
+    initTTS(granularity?: 'word' | 'sentence', highlight?: (range: Range) => void): Promise<void>
+    tts: {
+      start(): string | undefined
+      next(paused?: boolean): string | undefined
+      prev(paused?: boolean): string | undefined
+      from(range: Range): string | undefined
+      setMark(mark: string): void
+    } | null
     book: FoliateBook
     renderer: Paginator
     lastLocation: RelocateDetail | null
