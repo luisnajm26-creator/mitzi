@@ -6,6 +6,8 @@ Al reportar algo, anota: **número de prueba, dispositivo, qué hiciste, qué es
 
 APK nuevo: `release/Mitzi-0.1.0-debug.apk`. Instálalo encima del anterior (no hace falta desinstalar; se conservan tus carpetas y tu progreso).
 
+**Por qué el teléfono no leía ningún libro:** el navegador interno de los Huawei sin Google es más viejo que Chrome, y la librería de EPUB usaba una función que todavía no existía ahí (`Object.groupBy`). Fallaba igual con todos los libros. Ahora Mitzi trae esa función (y otras) cuando falta, y para los PDF usa la versión compatible de pdf.js. Al abrir la app nueva, los libros que fallaron se vuelven a intentar solos.
+
 ## Android: leer la carpeta (Pura 70 Ultra y MatePad)
 
 | # | Haz esto | Debe pasar |
@@ -21,6 +23,7 @@ APK nuevo: `release/Mitzi-0.1.0-debug.apk`. Instálalo encima del anterior (no h
 | 9 | Borra un libro de la carpeta y vuelve a Mitzi | Desaparece del carrusel |
 | 10 | Desliza por el carrusel con más de 30 libros | Fluido; el teléfono no se calienta tras unos minutos |
 | 11 | Abre un libro grande (20 MB o más) | Se abre en pocos segundos |
+| 12 | Copia un PDF a la carpeta y ábrelo | Aparece con su portada y se lee bien |
 
 Si algo de esto falla, dime también en qué número se quedó el contador y si la app se cerró sola.
 
@@ -28,15 +31,16 @@ Si algo de esto falla, dime también en qué número se quedó el contador y si 
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 12 | Con fondo **Blanco** o **Crema**, pasa varias páginas con → | Sin destello blanco al empezar ni al terminar el giro; la sombra de la hoja aparece y se va suave |
-| 13 | Mira el centro del libro cuando la hoja cae del otro lado (con → y con ←) | La hoja se oscurece junto al lomo mientras cae y se une al libro; el centro no se aclara ni cambia de golpe al terminar |
-| 14 | Lo mismo con fondo **Negro** o **Noche** | Sin destello blanco ni franjas claras |
-| 15 | Arrastra la hoja despacio con el ratón y suéltala | Sin destello al tomarla ni al soltarla |
-| 16 | Haz clic (o toca) en el centro del libro varias veces | Las barras de arriba y abajo aparecen y se van con un fundido suave; sin destello negro |
+| 13 | Con fondo **Blanco** o **Crema**, pasa varias páginas con → | Sin destello blanco al empezar ni al terminar el giro; la sombra de la hoja aparece y se va suave |
+| 14 | Mira el centro del libro cuando la hoja cae del otro lado (con → y con ←) | La hoja se oscurece junto al lomo mientras cae y se une al libro; el centro no se aclara ni cambia de golpe al terminar |
+| 15 | Mira la hoja justo cuando pasa por encima del lomo | La hoja se ve sólida: no deja ver la sombra del centro a través |
+| 16 | Repite 13 a 15 con fondo **Negro** o **Noche** | Sin destello blanco ni franjas claras |
+| 17 | Arrastra la hoja despacio con el ratón y suéltala | Sin destello al tomarla ni al soltarla |
+| 18 | Haz clic (o toca) en el centro del libro varias veces | Las barras de arriba y abajo aparecen y se van con un fundido suave; sin destello negro |
 
 ## Bordes del libro 3D
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 17 | En la biblioteca, mira el libro del centro dar una vuelta completa | El lomo y las esquinas se ven limpios: sin franja con ruido ni parpadeo donde el lomo se une con las tapas |
-| 18 | Mira los libros de los lados al cambiar de libro | Igual de limpios |
+| 19 | En la biblioteca, mira el libro del centro dar una vuelta completa | El lomo y las esquinas se ven limpios: sin franja con ruido ni parpadeo donde el lomo se une con las tapas |
+| 20 | Mira los libros de los lados al cambiar de libro | Igual de limpios |

@@ -28,8 +28,6 @@ interface Setup {
   backFromLocal: Mat
   restB: DOMRect
   restC: DOMRect
-  /** dónde está la sombra del lomo (null si no hay libro abierto) */
-  crease: DOMRect | null
 }
 
 type Mode = 'idle' | 'preparing' | 'auto' | 'drag' | 'settle'
@@ -95,7 +93,8 @@ export class PageFlip {
     this.#cast = el('flip-shadow', under)
     this.#castBar = el('flip-bar', this.#cast)
     this.#C = el('flip-slot', over)
-    this.#crease = el('flip-crease', over)
+    this.#crease = document.createElement('div')
+    this.#crease.className = 'flip-crease'
     this.#shade = el('flip-shadow', over)
     this.#shadeBar = el('flip-bar', this.#shade)
     this.slots = [this.#A, this.#B, this.#C]
@@ -209,6 +208,7 @@ export class PageFlip {
 
     const A = this.#A, B = this.#B, C = this.#C
     for (const s of this.slots) s.removeAttribute('data-faint')
+    this.#crease.remove() // se vuelve a poner con la página que llega (solo en el libro abierto)
     try {
       // lo que se ve ahora, copiado antes de cambiar de página
       if (!reverse) {
@@ -244,7 +244,8 @@ export class PageFlip {
       if (book) {
         place(C, otherRect)
         const ok = await engine.paintPage(C, otherSide, otherRect)
-        if (!ok) C.replaceChildren()
+        if (ok) this.#attachCrease(ctx.gutter, ctx.dark, otherRect)
+        else C.replaceChildren()
       } else if (reverse) {
         place(B, stage)
         B.hidden = false
@@ -273,7 +274,6 @@ export class PageFlip {
       backFromLocal: book ? MIRROR : IDENTITY,
       restB: reverse ? stage : turningRect,
       restC: book ? otherRect : turningRect,
-      crease: this.#placeCrease(book ? ctx.gutter : null, ctx.dark),
     }
     this.#t = reverse ? { ...end } : { ...corner }
     this.#v = { x: 0, y: 0 }
@@ -358,17 +358,29 @@ export class PageFlip {
     this.#under.style.visibility = 'hidden'
     this.#over.style.visibility = 'hidden'
     // los hijos heredan la visibilidad de su capa: así nada queda dibujado en reposo
-    for (const e of [...this.slots, this.#crease, this.#cast, this.#shade]) Object.assign(e.style, { clipPath: '', transform: '', visibility: '' })
+    for (const e of [...this.slots, this.#cast, this.#shade]) Object.assign(e.style, { clipPath: '', transform: '', visibility: '' })
   }
 
-  /** Copia la sombra del lomo (mismo degradado y lugar) sobre la hoja que gira. */
-  #placeCrease(gutter: HTMLElement | null | undefined, dark: boolean): DOMRect | null {
-    if (!gutter) return null
+  /**
+   * La sombra del lomo va pegada al reverso de la hoja, en el lugar donde la hoja va a
+   * caer: viaja con ella (no se ve a través) y, cuando termina de asentarse, coincide
+   * con la sombra del libro, así que nada cambia de golpe.
+   */
+  #attachCrease(gutter: HTMLElement | null | undefined, dark: boolean, rest: DOMRect) {
+    if (!gutter) {
+      this.#crease.remove()
+      return
+    }
     const r = gutter.getBoundingClientRect()
-    place(this.#crease, r)
-    this.#crease.style.background = gutter.style.background
+    Object.assign(this.#crease.style, {
+      left: `${r.left - rest.left}px`,
+      top: `${r.top - rest.top}px`,
+      width: `${r.width}px`,
+      height: `${r.height}px`,
+      background: gutter.style.background,
+    })
     this.#crease.dataset.dark = String(dark)
-    return r
+    this.#C.append(this.#crease)
   }
 
   // ---------- dibujo de cada cuadro ----------
@@ -382,7 +394,6 @@ export class PageFlip {
     this.#B.style.clipPath = rel(fold.flatPart.map(toScr), s.restB)
     if (fold.flat) {
       this.#C.style.visibility = 'hidden'
-      this.#crease.style.visibility = 'hidden'
       this.#cast.style.visibility = 'hidden'
       this.#shade.style.visibility = 'hidden'
       return
@@ -395,15 +406,6 @@ export class PageFlip {
     this.#C.style.transform = toCssMatrix({ ...S, e: moved.x - origin.x, f: moved.y - origin.y })
     this.#C.style.clipPath = rel(fold.foldedPart.map(p => toScr(apply(s.backFromLocal, p))), s.restC)
     this.#C.style.visibility = ''
-
-    // al caer sobre la otra página, la hoja se hunde en el lomo y toma su misma sombra:
-    // así, al terminar, la sombra del libro ya estaba ahí y nada se enciende de golpe
-    if (s.crease) {
-      const land = clamp01((fold.progress - 0.5) / 0.5)
-      this.#crease.style.clipPath = rel(fold.flap.map(toScr), s.crease)
-      this.#crease.style.opacity = String(land * land * (3 - 2 * land))
-      this.#crease.style.visibility = ''
-    } else this.#crease.style.visibility = 'hidden'
 
     // sombras alineadas con el doblez
     const lift = Math.sin(Math.PI * fold.progress)

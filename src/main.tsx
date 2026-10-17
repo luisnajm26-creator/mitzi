@@ -1,3 +1,5 @@
+// primero: funciones que faltan en navegadores internos viejos (Android sin Google)
+import './lib/polyfills'
 import { createRoot } from 'react-dom/client'
 import '@fontsource-variable/nunito'
 import '@fontsource-variable/literata'
