@@ -6,6 +6,7 @@ import { epubCss } from '../comfort/epubCss'
 import type { ComfortSettings } from '../comfort/settings'
 import { GhostPages } from '../pageTurn/epubGhost'
 import { createEpubSpeech } from '../tts/epubSpeech'
+import { setupPlate } from './plates'
 import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, TocEntry, ViewOptions } from './types'
 
 const idle = () => new Promise<void>(resolve => (window.requestIdleCallback ?? setTimeout)(() => resolve()))
@@ -235,6 +236,8 @@ export class EpubEngine implements ReaderEngine {
 
   /** Los toques y teclas ocurren dentro del iframe del libro; se pasan a la interfaz. */
   #attach(doc: Document, index: number) {
+    // páginas que son solo una ilustración: a página completa (o doble, si es horizontal)
+    setupPlate(doc)
     doc.addEventListener('keydown', e => this.#callbacks.onKey(e))
     // selección de texto para subrayar (con ratón, teclado o las manijas de Android)
     const checkSelection = () => {
