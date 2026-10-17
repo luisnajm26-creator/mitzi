@@ -1,4 +1,5 @@
 import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
+import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import type { ComfortSettings } from '../comfort/settings'
 import { loadPdfjs, pdfAssetOptions } from './pdfjs'
@@ -30,6 +31,15 @@ export class PdfEngine implements ReaderEngine {
   #swipedAt = 0
   #view: ViewOptions = { bookMode: false, pageWidth: 0 }
   #aspect = 0.7
+  #pdfjs: Awaited<ReturnType<typeof loadPdfjs>> | null = null
+  /** subrayados por página */
+  #annotations: AnnotationRecord[] = []
+  #hadSelection = false
+  #selTimer: ReturnType<typeof setTimeout> | undefined
+  #onSelectionChange = () => {
+    clearTimeout(this.#selTimer)
+    this.#selTimer = setTimeout(() => this.#checkSelection(), 350)
+  }
 
   constructor(callbacks: EngineCallbacks) {
     this.#cb = callbacks
@@ -49,6 +59,7 @@ export class PdfEngine implements ReaderEngine {
     this.#bindInput()
 
     const pdfjs = await loadPdfjs()
+    this.#pdfjs = pdfjs
     this.#task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()), ...pdfAssetOptions() })
     this.#doc = await this.#task.promise
     const page = location ? parseInt(location, 10) : 1
@@ -142,7 +153,20 @@ export class PdfEngine implements ReaderEngine {
     }
   }
 
+  setAnnotations(list: AnnotationRecord[], theme: ThemeColors) {
+    this.#theme = theme
+    this.#annotations = list.filter(a => !a.deleted && a.rects?.length)
+    for (const wrap of this.#sheet?.querySelectorAll<HTMLElement>('.pdf-page') ?? []) this.#drawMarks(wrap)
+  }
+
+  clearSelection() {
+    this.#hadSelection = false
+    const sel = window.getSelection()
+    if (sel && this.#stage.contains(sel.anchorNode)) sel.removeAllRanges()
+  }
+
   destroy() {
+    document.removeEventListener('selectionchange', this.#onSelectionChange)
     this.#token++
     for (const t of this.#tasks) t.cancel()
     this.#observer?.disconnect()
@@ -245,6 +269,7 @@ export class PdfEngine implements ReaderEngine {
     const wraps = canvases.map((canvas, k) => {
       const wrap = document.createElement('div')
       wrap.className = 'pdf-page'
+      wrap.dataset.page = String(visible[k] + 1)
       // como en un libro impreso: la portada (página 1) a la derecha, las pares a la izquierda
       if (book) wrap.dataset.side = visible[k] % 2 === 1 ? 'left' : 'right'
       else if (visible.length === 2) wrap.dataset.side = k === 0 ? 'left' : 'right'
@@ -253,6 +278,9 @@ export class PdfEngine implements ReaderEngine {
     })
     this.#sheet.dataset.book = String(book)
     this.#sheet.replaceChildren(...wraps)
+    for (const wrap of wraps) this.#drawMarks(wrap)
+    // capa de texto invisible encima del dibujo: permite seleccionar y subrayar
+    pages.forEach((page, k) => this.#addTextLayer(page, wraps[k], scale, token))
     if (fitWidth) this.#stage.scrollTop = 0
     this.#emit(visible)
   }
@@ -291,11 +319,97 @@ export class PdfEngine implements ReaderEngine {
     return out
   }
 
+  async #addTextLayer(page: PDFPageProxy, wrap: HTMLElement, scale: number, token: number) {
+    if (!this.#pdfjs) return
+    const layer = document.createElement('div')
+    layer.className = 'textLayer'
+    for (const v of ['--scale-factor', '--total-scale-factor']) layer.style.setProperty(v, String(scale))
+    layer.style.setProperty('--user-unit', '1')
+    const textLayer = new this.#pdfjs.TextLayer({
+      textContentSource: page.streamTextContent(),
+      container: layer,
+      viewport: page.getViewport({ scale }),
+    })
+    try {
+      await textLayer.render()
+    } catch {
+      return
+    }
+    if (token === this.#token) wrap.append(layer)
+  }
+
+  /** Subrayados de una página, en proporción a su tamaño (sirven a cualquier zoom). */
+  #drawMarks(wrap: HTMLElement) {
+    wrap.querySelector('.pdf-marks')?.remove()
+    const anchor = `page:${wrap.dataset.page}`
+    const list = this.#annotations.filter(a => a.anchor === anchor)
+    if (!list.length || !this.#theme) return
+    const marks = document.createElement('div')
+    marks.className = 'pdf-marks'
+    for (const a of list)
+      for (const [x, y, w, h] of a.rects ?? []) {
+        const m = document.createElement('div')
+        Object.assign(m.style, {
+          left: `${x * 100}%`,
+          top: `${y * 100}%`,
+          width: `${w * 100}%`,
+          height: `${h * 100}%`,
+          background: this.#theme.highlights[a.color],
+        })
+        marks.append(m)
+      }
+    wrap.append(marks)
+  }
+
+  #checkSelection() {
+    const sel = window.getSelection()
+    const text = sel?.toString().trim()
+    const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null
+    const node = range?.startContainer
+    const wrap = (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.pdf-page')
+    if (!sel || sel.isCollapsed || !text || !range || !wrap || !this.#stage.contains(wrap)) {
+      if (this.#hadSelection) {
+        this.#hadSelection = false
+        this.#cb.onSelect(null)
+      }
+      return
+    }
+    const box = wrap.getBoundingClientRect()
+    const rects = [...range.getClientRects()]
+      .filter(r => r.width > 1 && r.height > 1 && r.top < box.bottom && r.bottom > box.top)
+      .map(r => [(r.left - box.left) / box.width, (r.top - box.top) / box.height, r.width / box.width, r.height / box.height] as [number, number, number, number])
+    if (!rects.length) return
+    this.#hadSelection = true
+    this.#cb.onSelect({ text, rect: range.getBoundingClientRect(), anchor: `page:${wrap.dataset.page}`, rects })
+  }
+
+  /** ¿El punto (en la ventana) cae sobre un subrayado? */
+  #hitAnnotation(x: number, y: number, target: EventTarget | null) {
+    const wrap = (target as Element | null)?.closest?.<HTMLElement>('.pdf-page')
+    if (!wrap) return null
+    const box = wrap.getBoundingClientRect()
+    const px = (x - box.left) / box.width
+    const py = (y - box.top) / box.height
+    const anchor = `page:${wrap.dataset.page}`
+    for (const a of this.#annotations) {
+      if (a.anchor !== anchor) continue
+      const hit = a.rects?.find(([rx, ry, rw, rh]) => px >= rx && px <= rx + rw && py >= ry && py <= ry + rh)
+      if (hit) return { id: a.id, rect: new DOMRect(box.left + hit[0] * box.width, box.top + hit[1] * box.height, hit[2] * box.width, hit[3] * box.height) }
+    }
+    return null
+  }
+
   #bindInput() {
+    document.addEventListener('selectionchange', this.#onSelectionChange)
+    this.#stage.addEventListener('pointerup', () => setTimeout(() => this.#checkSelection(), 10))
     this.#stage.addEventListener('click', e => {
       // un deslizamiento también dispara "click"; ese no cuenta como toque
       if (performance.now() - this.#swipedAt < 400) return
-      this.#cb.onTap(e.clientX, e.clientY)
+      const sel = window.getSelection()
+      if (sel && !sel.isCollapsed) return
+      const hit = this.#hitAnnotation(e.clientX, e.clientY, e.target)
+      if (hit) this.#cb.onAnnotationTap(hit.id, hit.rect)
+      else this.#cb.onTap(e.clientX, e.clientY)
     })
     this.#stage.addEventListener('keydown', e => this.#cb.onKey(e))
     this.#stage.addEventListener(

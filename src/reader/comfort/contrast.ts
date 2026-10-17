@@ -1,6 +1,7 @@
 import { contrast, isDark, lchToHex, mix, toLch, withAlpha } from '../../lib/color'
+import type { HighlightColor } from '../../library/db'
 
-export type HighlightColor = 'amarillo' | 'verde' | 'azul' | 'rosa' | 'lila'
+export type { HighlightColor }
 
 export interface ThemeColors {
   bg: string

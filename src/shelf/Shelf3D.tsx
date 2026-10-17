@@ -2,6 +2,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { memo, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import * as THREE from 'three'
 import type { BookRecord } from '../library/db'
+import { platform } from '../platform'
 import { ambientColors } from '../library/palette'
 import { CarouselController } from './carousel'
 import { LightRig } from './LightRig'
@@ -329,6 +330,11 @@ export function Shelf3D({ books, motion, palette, active, onCenterChange, onOpen
   useEffect(() => {
     motion.ctrl.setCount(books.length)
   }, [books.length, motion])
+
+  // la biblioteca anima en continuo: frecuencia alta solo mientras está despierta y visible
+  useEffect(() => {
+    platform.setHighRefresh?.(active && awake)
+  }, [active, awake])
 
   useEffect(() => {
     if (active) wake()

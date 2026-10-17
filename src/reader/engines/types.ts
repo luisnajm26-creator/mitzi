@@ -1,3 +1,4 @@
+import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import type { ComfortSettings } from '../comfort/settings'
 
@@ -17,6 +18,15 @@ export interface ReaderLocation {
   pageLabel?: string
 }
 
+/** Texto seleccionado, listo para subrayar. */
+export interface TextSelection {
+  text: string
+  /** dónde está en la ventana (para poner el menú encima) */
+  rect: DOMRect
+  anchor: string
+  rects?: AnnotationRecord['rects']
+}
+
 export interface EngineCallbacks {
   onRelocate(location: ReaderLocation): void
   /** Toque o clic sobre el texto, en coordenadas de la ventana. */
@@ -26,6 +36,10 @@ export interface EngineCallbacks {
   onWheel(e: WheelEvent): void
   /** Deslizar a un lado en pantallas táctiles (cuando el motor no lo maneja solo). */
   onSwipe(dir: 1 | -1): void
+  /** Se seleccionó texto (o se quitó la selección: null). */
+  onSelect(selection: TextSelection | null): void
+  /** Se tocó un subrayado existente. */
+  onAnnotationTap(id: string, rect: DOMRect): void
 }
 
 /** Cómo se muestra el libro: en PC/tablet horizontal, como libro abierto de dos páginas. */
@@ -72,5 +86,8 @@ export interface ReaderEngine {
   pageAspect(): number
   /** Captura lo visible, o null si este modo no admite la animación. */
   snapshot(): Promise<Snapshot | null>
+  /** Dibuja los subrayados del libro (se llama de nuevo cuando cambian). */
+  setAnnotations(list: AnnotationRecord[], theme: ThemeColors): void
+  clearSelection(): void
   destroy(): void
 }

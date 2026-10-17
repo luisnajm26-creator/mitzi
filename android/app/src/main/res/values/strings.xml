@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mitzi</string>
+    <string name="title_activity_main">Mitzi</string>
+    <string name="package_name">io.github.luisnajm26creator.mitzi</string>
+    <string name="custom_url_scheme">io.github.luisnajm26creator.mitzi</string>
+</resources>

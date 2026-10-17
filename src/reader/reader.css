@@ -26,8 +26,8 @@
 .reader-stage {
   position: absolute;
   inset: 0;
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-top: var(--sa-top);
+  padding-bottom: var(--sa-bottom);
 }
 
 .epub-view {
@@ -216,7 +216,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left));
+  padding: 10px max(14px, var(--sa-right)) 10px max(14px, var(--sa-left));
   background: color-mix(in srgb, var(--r-surface) 88%, transparent);
   backdrop-filter: blur(14px);
   transition:
@@ -226,13 +226,13 @@
 
 .reader-bar.top {
   top: 0;
-  padding-top: max(10px, env(safe-area-inset-top));
+  padding-top: max(10px, var(--sa-top));
   border-bottom: 1px solid var(--r-border);
 }
 
 .reader-bar.bottom {
   bottom: 0;
-  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-bottom: max(12px, var(--sa-bottom));
   border-top: 1px solid var(--r-border);
 }
 
@@ -415,7 +415,7 @@
   bottom: 0;
   width: min(380px, 100%);
   overflow-y: auto;
-  padding: max(14px, env(safe-area-inset-top)) 18px max(20px, env(safe-area-inset-bottom));
+  padding: max(14px, var(--sa-top)) 18px max(20px, var(--sa-bottom));
   background: var(--r-surface);
   color: var(--r-fg);
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.18);
@@ -796,4 +796,309 @@
 .toc-list button[data-current='true'] {
   background: color-mix(in srgb, var(--r-fg) 11%, transparent);
   font-weight: 700;
+}
+
+/* ---------- PDF: texto seleccionable y subrayados ---------- */
+.pdf-page {
+  position: relative;
+}
+
+.pdf-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+.pdf-stage[data-dark='true'] .pdf-marks {
+  mix-blend-mode: screen;
+}
+
+.pdf-marks > div {
+  position: absolute;
+  border-radius: 2px;
+}
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 1;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+  display: contents;
+}
+
+.textLayer ::selection {
+  background: color-mix(in srgb, var(--r-link) 30%, transparent);
+  color: transparent;
+}
+
+/* ---------- menús de subrayado ---------- */
+.float-menu {
+  position: absolute;
+  z-index: 35;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  background: var(--r-surface);
+  color: var(--r-fg);
+  border: 1px solid var(--r-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+  animation: rise-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.float-menu.column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.float-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-dots {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.color-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--r-fg) 18%, transparent);
+  padding: 0;
+  transition: transform 140ms ease;
+}
+
+.color-dot[data-on='true'] {
+  border-color: var(--r-fg);
+}
+
+.color-dot:active {
+  transform: scale(0.9);
+}
+
+.float-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--r-border);
+}
+
+.float-action {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--r-fg);
+}
+
+.float-action:hover {
+  background: color-mix(in srgb, var(--r-fg) 9%, transparent);
+}
+
+.float-note {
+  margin: 4px 2px 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--r-muted);
+  max-height: 4.2em;
+  overflow: hidden;
+}
+
+.note-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  animation: fade-in 160ms ease both;
+}
+
+.note-editor {
+  width: min(520px, 100%);
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--r-surface);
+  color: var(--r-fg);
+  border: 1px solid var(--r-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.note-editor blockquote {
+  margin: 0 0 12px;
+  padding: 2px 0 2px 12px;
+  border-left: 3px solid var(--r-border);
+  color: var(--r-muted);
+  font-size: 14px;
+  line-height: 1.45;
+  max-height: 6em;
+  overflow: auto;
+}
+
+.note-editor textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--r-border);
+  background: var(--r-bg);
+  color: var(--r-fg);
+  user-select: text;
+}
+
+.note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.reader-pill.primary {
+  background: var(--r-fg);
+  color: var(--r-bg);
+  border-color: var(--r-fg);
+}
+
+/* ---------- panel de notas ---------- */
+.notes-panel {
+  right: 0;
+  border-left: 1px solid var(--r-border);
+  animation: panel-right 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.notes-export {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0 14px;
+}
+
+.notes-export .reader-pill {
+  padding: 7px 14px;
+  font-size: 13px;
+}
+
+.notes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.notes-list li {
+  display: flex;
+  gap: 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--r-fg) 4%, transparent);
+  border-left: 5px solid var(--mark);
+  overflow: hidden;
+}
+
+.note-go {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 4px 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--r-fg);
+  text-align: left;
+}
+
+.note-chapter {
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--r-muted);
+}
+
+.note-text {
+  font-size: 14px;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.note-body {
+  font-size: 13.5px;
+  font-style: italic;
+  color: var(--r-muted);
+}
+
+.note-tools {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 6px 6px 0;
+}
+
+.note-tools button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--r-muted);
+}
+
+.note-tools button:hover {
+  background: color-mix(in srgb, var(--r-fg) 8%, transparent);
+  color: var(--r-fg);
+}
+
+@media (max-width: 640px) {
+  .notes-panel {
+    border-left: 0;
+    animation: panel-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
 }

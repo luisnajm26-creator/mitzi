@@ -4,6 +4,7 @@ import { platform, isTouchDevice } from '../platform'
 import type { LibraryFolders } from '../platform/types'
 import { useLibrary } from '../library/store'
 import { db } from '../library/db'
+import { syncLibrary } from '../library/scanner'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
 import { AmbientBackground } from './AmbientBackground'
 import { createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
@@ -167,9 +168,33 @@ function useFolders() {
   return [folders, reload] as const
 }
 
+const label = (folder: string) => platform.folderLabel?.(folder) ?? folder
+
+/** Agrega una carpeta y vuelve a revisar la biblioteca. */
+const addFolder = async () => {
+  if (await platform.addFolder()) await syncLibrary()
+}
+
 function EmptyState({ onFolders }: { onFolders(): void }) {
   const [folders] = useFolders()
   const folder = folders?.defaultFolder
+  if (platform.kind === 'android')
+    return (
+      <div className="empty-state">
+        <div className="empty-glow" />
+        <h2>Tu biblioteca está vacía</h2>
+        <p>
+          Mitzi no trae libros. Elige la carpeta del teléfono donde guardas tus <strong>EPUB</strong> o <strong>PDF</strong> y
+          aparecerán aquí solos.
+        </p>
+        <div className="empty-actions">
+          <button className="read-button" onClick={addFolder}>
+            Elegir carpeta
+          </button>
+        </div>
+        <p className="hint">También puedes abrir un libro desde el gestor de archivos con «Abrir con Mitzi».</p>
+      </div>
+    )
   return (
     <div className="empty-state">
       <div className="empty-glow" />
@@ -211,7 +236,7 @@ function FoldersPanel({ onClose }: { onClose(): void }) {
         <ul className="folder-list">
           {folders?.folders.map(folder => (
             <li key={folder}>
-              <code>{folder}</code>
+              <code>{label(folder)}</code>
               <div className="folder-actions">
                 {platform.kind === 'electron' && (
                   <button className="ghost-button small" onClick={() => platform.revealFolder(folder)}>
@@ -219,7 +244,7 @@ function FoldersPanel({ onClose }: { onClose(): void }) {
                   </button>
                 )}
                 {platform.canManageFolders && folder !== folders.defaultFolder && (
-                  <button className="ghost-button small" onClick={() => platform.removeFolder(folder).then(reload)}>
+                  <button className="ghost-button small" onClick={() => platform.removeFolder(folder).then(reload).then(() => syncLibrary())}>
                     Quitar
                   </button>
                 )}
@@ -228,7 +253,7 @@ function FoldersPanel({ onClose }: { onClose(): void }) {
           ))}
         </ul>
         {platform.canManageFolders ? (
-          <button className="read-button" onClick={() => platform.addFolder().then(reload)}>
+          <button className="read-button" onClick={() => addFolder().then(reload)}>
             Agregar carpeta
           </button>
         ) : (

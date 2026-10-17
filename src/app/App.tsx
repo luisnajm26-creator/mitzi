@@ -42,7 +42,13 @@ export function App() {
     window.addEventListener('keydown', onKey)
     window.addEventListener('dragover', onDragOver)
     window.addEventListener('drop', onDrop)
+    // botón "atrás" de Android: en el lector actúa como Esc; en la biblioteca sale de la app
+    const offBack = platform.onBackButton?.(() => {
+      if (useApp.getState().view.name === 'reader') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      else platform.exitApp?.()
+    })
     return () => {
+      offBack?.()
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('dragover', onDragOver)
       window.removeEventListener('drop', onDrop)

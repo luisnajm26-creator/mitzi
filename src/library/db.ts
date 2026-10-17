@@ -43,10 +43,33 @@ export interface ProgressRecord {
   updatedAt: number
 }
 
+export type HighlightColor = 'amarillo' | 'verde' | 'azul' | 'rosa' | 'lila'
+
+/** Subrayado (y nota opcional) dentro de un libro. */
+export interface AnnotationRecord {
+  id: string
+  bookId: string
+  /** EPUB: CFI del texto subrayado. PDF: "page:N". */
+  anchor: string
+  /** PDF: rectángulos del subrayado en la página, en proporción (0–1): [x, y, ancho, alto]. */
+  rects?: [number, number, number, number][]
+  color: HighlightColor
+  text: string
+  note?: string
+  chapter?: string
+  /** Posición en el libro (0–1), para ordenar. */
+  fraction: number
+  createdAt: number
+  updatedAt: number
+  /** Borrado lógico: así el borrado también se sincroniza entre dispositivos. */
+  deleted?: boolean
+}
+
 class MitziDB extends Dexie {
   books!: Table<BookRecord, string>
   files!: Table<FileRecord, string>
   progress!: Table<ProgressRecord, string>
+  annotations!: Table<AnnotationRecord, string>
 
   constructor() {
     super('mitzi')
@@ -54,6 +77,9 @@ class MitziDB extends Dexie {
       books: 'id, path, lastOpenedAt, addedAt',
       files: 'path, bookId',
       progress: 'bookId, updatedAt',
+    })
+    this.version(2).stores({
+      annotations: 'id, bookId, updatedAt',
     })
   }
 }

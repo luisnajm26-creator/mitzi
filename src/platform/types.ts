@@ -11,6 +11,8 @@ export interface Platform {
   addFolder(): Promise<boolean>
   removeFolder(folder: string): Promise<void>
   revealFolder(folder: string): Promise<void>
+  /** Nombre legible de una carpeta (en Android las carpetas son URIs). */
+  folderLabel?(folder: string): string
   scan(): Promise<BookFile[]>
   readFile(path: string): Promise<ArrayBuffer>
   onLibraryChanged(cb: () => void): () => void
@@ -19,4 +21,11 @@ export interface Platform {
   toggleFullscreen(): Promise<boolean>
   onFullscreenChanged(cb: (fullscreen: boolean) => void): () => void
   keepAwake(on: boolean): Promise<void>
+  /** Oculta las barras del sistema (Android) para leer a pantalla completa. */
+  setImmersive?(on: boolean): Promise<void>
+  /** Pide la frecuencia de pantalla más alta mientras hay animación (Android). */
+  setHighRefresh?(on: boolean): Promise<void>
+  /** Botón "atrás" del sistema (Android). */
+  onBackButton?(cb: () => void): () => void
+  exitApp?(): void
 }

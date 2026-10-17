@@ -11,6 +11,14 @@ const paths = {
   moon: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
   check: 'M5 12.5l4.5 4.5L19 7.5',
   book: 'M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5zM4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5',
+  note: 'M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 8.5l3 3',
+  trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  copy: 'M9 9h10v11H9zM5 15V4h10',
+  bookmark: 'M6 3h12v18l-6-4-6 4z',
+  play: 'M7 4.5v15l12-7.5z',
+  pause: 'M7 4h3.5v16H7zM13.5 4H17v16h-3.5z',
+  speaker: 'M4 9.5v5h4l5 4v-13l-5 4zM16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12',
+  stop: 'M6 6h12v12H6z',
 } as const
 
 export type IconName = keyof typeof paths

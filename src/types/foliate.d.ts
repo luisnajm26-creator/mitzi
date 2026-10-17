@@ -56,7 +56,15 @@ declare module 'foliate-js/view.js' {
     destroy(): void
   }
 
+  export interface ViewAnnotation {
+    value: string
+    [key: string]: unknown
+  }
+
   export class View extends HTMLElement {
+    addAnnotation(annotation: ViewAnnotation, remove?: boolean): Promise<{ index: number; label: string } | undefined>
+    deleteAnnotation(annotation: ViewAnnotation): Promise<unknown>
+    getCFI(index: number, range: Range): string
     book: FoliateBook
     renderer: Paginator
     lastLocation: RelocateDetail | null
@@ -74,4 +82,13 @@ declare module 'foliate-js/view.js' {
   }
 
   export function makeBook(file: File | Blob | string): Promise<FoliateBook>
+}
+
+declare module 'foliate-js/overlayer.js' {
+  type DrawFn = (rects: DOMRectList, options?: Record<string, unknown>) => SVGElement
+  export class Overlayer {
+    static highlight: DrawFn
+    static underline: DrawFn
+    static outline: DrawFn
+  }
 }

@@ -13,9 +13,12 @@ import type { EngineCallbacks, ReaderEngine, ReaderLocation, TocEntry, ViewOptio
 import { computeBookGeometry, OpenBookBase, OpenBookGutter } from './layouts/OpenBook'
 import { PageTurner } from './pageTurn/PageTurner'
 import { TocPanel } from './TocPanel'
+import { AnnotationPopover, NoteEditor, NotesPanel, SelectionMenu } from './annotations/Annotations'
+import type { AnnotationRecord, HighlightColor } from '../library/db'
+import type { TextSelection } from './engines/types'
 import './reader.css'
 
-type Panel = null | 'toc' | 'comfort'
+type Panel = null | 'toc' | 'comfort' | 'notes'
 
 export default function Reader({ bookId }: { bookId: string }) {
   const closeBook = useApp(s => s.closeBook)
@@ -40,12 +43,17 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [toc, setToc] = useState<TocEntry[]>([])
   const [chrome, setChrome] = useState(true)
   const [panel, setPanel] = useState<Panel>(null)
+  const [annotations, setAnnotations] = useState<AnnotationRecord[]>([])
+  const [selection, setSelection] = useState<TextSelection | null>(null)
+  const [tapped, setTapped] = useState<{ id: string; rect: DOMRect } | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const [scrub, setScrub] = useState<number | null>(null)
 
   const pending = useRef<ReaderLocation | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const wheel = useRef({ acc: 0, lockUntil: 0 })
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   // libro abierto de dos páginas en pantallas horizontales (si se lee por páginas)
   const bookGeo = useMemo(
@@ -86,7 +94,14 @@ export default function Reader({ bookId }: { bookId: string }) {
       else engine.prev()
       return
     }
-    turnerRef.current.turn(engine, dir, { book: v.bookMode, pages: stage.getBoundingClientRect(), bg: t.bg, dark: t.dark })
+    // frecuencia alta solo mientras gira la hoja; en reposo la pantalla vuelve a ahorrar
+    platform.setHighRefresh?.(true)
+    clearTimeout(refreshTimer.current)
+    turnerRef.current
+      .turn(engine, dir, { book: v.bookMode, pages: stage.getBoundingClientRect(), bg: t.bg, dark: t.dark })
+      .finally(() => {
+        refreshTimer.current = setTimeout(() => platform.setHighRefresh?.(false), 1200)
+      })
   }, [])
 
   // acciones que llaman los motores; leen siempre el estado más reciente
@@ -97,6 +112,10 @@ export default function Reader({ bookId }: { bookId: string }) {
   })
   actions.current = {
     tap(x) {
+      if (tappedRef.current) {
+        setTapped(null)
+        return
+      }
       if (latest.current.panel) {
         setPanel(null)
         return
@@ -116,7 +135,8 @@ export default function Reader({ bookId }: { bookId: string }) {
       if (['ArrowRight', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) turn(1)
       else if (['ArrowLeft', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)) turn(-1)
       else if (e.key === 'Escape') {
-        if (latest.current.panel) setPanel(null)
+        if (tappedRef.current) setTapped(null)
+        else if (latest.current.panel) setPanel(null)
         else back()
       } else return
       e.preventDefault()
@@ -148,6 +168,14 @@ export default function Reader({ bookId }: { bookId: string }) {
       onKey: e => actions.current.key(e),
       onWheel: e => actions.current.wheel(e),
       onSwipe: dir => turn(dir),
+      onSelect: sel => {
+        setSelection(sel)
+        if (sel) setTapped(null)
+      },
+      onAnnotationTap: (id, rect) => {
+        setSelection(null)
+        setTapped({ id, rect })
+      },
     }
     ;(async () => {
       try {
@@ -167,6 +195,9 @@ export default function Reader({ bookId }: { bookId: string }) {
         if (cancelled) return
         setPageAspect(engine.pageAspect())
         setToc(engine.toc())
+        const saved = await db.annotations.where('bookId').equals(bookId).toArray()
+        if (cancelled) return
+        setAnnotations(saved.filter(a => !a.deleted))
         setStatus('ready')
         hideTimer.current = setTimeout(() => setChrome(false), 2200)
       } catch (e) {
@@ -189,6 +220,57 @@ export default function Reader({ bookId }: { bookId: string }) {
     engineRef.current?.apply(settings, theme, view)
   }, [settings, theme, view])
 
+  // subrayados: se redibujan al cambiar la lista o el tema (sus colores dependen del fondo)
+  useEffect(() => {
+    if (status === 'ready') engineRef.current?.setAnnotations(annotations, theme)
+  }, [annotations, theme, status])
+
+  const tappedRef = useRef(tapped)
+  tappedRef.current = tapped
+
+  // al abrir un panel se cierran los menús flotantes
+  useEffect(() => {
+    if (panel) {
+      setTapped(null)
+      setSelection(null)
+    }
+  }, [panel])
+
+  const saveAnnotation = useCallback(async (record: AnnotationRecord) => {
+    await db.annotations.put(record)
+    setAnnotations(list => [...list.filter(a => a.id !== record.id), ...(record.deleted ? [] : [record])])
+  }, [])
+
+  const highlight = (color: HighlightColor, withNote = false) => {
+    if (!selection) return
+    const now = Date.now()
+    const record: AnnotationRecord = {
+      id: crypto.randomUUID(),
+      bookId,
+      anchor: selection.anchor,
+      rects: selection.rects,
+      color,
+      text: selection.text,
+      chapter: loc?.chapter,
+      fraction: loc?.fraction ?? 0,
+      createdAt: now,
+      updatedAt: now,
+    }
+    saveAnnotation(record)
+    engineRef.current?.clearSelection()
+    setSelection(null)
+    if (withNote) setEditing(record.id)
+  }
+
+  const updateAnnotation = (id: string, patch: Partial<AnnotationRecord>) => {
+    const current = annotations.find(a => a.id === id)
+    if (current) saveAnnotation({ ...current, ...patch, updatedAt: Date.now() })
+  }
+
+  const sortedAnnotations = useMemo(() => [...annotations].sort((a, b) => a.fraction - b.fraction), [annotations])
+  const tappedAnnotation = tapped ? annotations.find(a => a.id === tapped.id) : undefined
+  const editingAnnotation = editing ? annotations.find(a => a.id === editing) : undefined
+
   // tamaño del lector, para decidir si se muestra como libro abierto
   useLayoutEffect(() => {
     const root = rootRef.current
@@ -209,6 +291,14 @@ export default function Reader({ bookId }: { bookId: string }) {
       platform.keepAwake(false)
     }
   }, [settings.keepAwake])
+
+  // en Android se lee a pantalla completa, sin barras del sistema
+  useEffect(() => {
+    platform.setImmersive?.(true)
+    return () => {
+      platform.setImmersive?.(false)
+    }
+  }, [])
 
   // el modo noche automático revisa la hora cada minuto
   useEffect(() => {
@@ -304,6 +394,9 @@ export default function Reader({ bookId }: { bookId: string }) {
           {loc?.chapter && <span>{loc.chapter}</span>}
         </div>
         <div className="reader-tools">
+          <button className="reader-icon" onClick={() => setPanel(p => (p === 'notes' ? null : 'notes'))} aria-label="Subrayados y notas" title="Subrayados y notas">
+            <Icon name="bookmark" />
+          </button>
           <button className="reader-icon" onClick={() => setPanel(p => (p === 'toc' ? null : 'toc'))} aria-label="Índice" title="Índice">
             <Icon name="toc" />
           </button>
@@ -335,6 +428,50 @@ export default function Reader({ bookId }: { bookId: string }) {
       </footer>
       <div className="reader-mini-progress" aria-hidden />
 
+      {selection && (
+        <SelectionMenu rect={selection.rect} text={selection.text} theme={theme} onHighlight={c => highlight(c)} onNote={() => highlight('amarillo', true)} />
+      )}
+      {tapped && tappedAnnotation && (
+        <AnnotationPopover
+          annotation={tappedAnnotation}
+          rect={tapped.rect}
+          theme={theme}
+          onColor={color => updateAnnotation(tappedAnnotation.id, { color })}
+          onEditNote={() => {
+            setEditing(tappedAnnotation.id)
+            setTapped(null)
+          }}
+          onDelete={() => {
+            updateAnnotation(tappedAnnotation.id, { deleted: true })
+            setTapped(null)
+          }}
+        />
+      )}
+      {editingAnnotation && (
+        <NoteEditor
+          annotation={editingAnnotation}
+          onClose={() => setEditing(null)}
+          onSave={note => {
+            updateAnnotation(editingAnnotation.id, { note: note || undefined })
+            setEditing(null)
+          }}
+        />
+      )}
+      {panel === 'notes' && book && (
+        <NotesPanel
+          title={book.title}
+          author={book.author}
+          annotations={sortedAnnotations}
+          theme={theme}
+          onClose={() => setPanel(null)}
+          onGo={a => {
+            engineRef.current?.goTo(a.anchor)
+            setPanel(null)
+          }}
+          onEdit={a => setEditing(a.id)}
+          onDelete={a => updateAnnotation(a.id, { deleted: true })}
+        />
+      )}
       {panel === 'toc' && (
         <TocPanel
           toc={toc}

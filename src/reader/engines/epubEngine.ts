@@ -1,4 +1,6 @@
-import type { RelocateDetail, TocItem, View } from 'foliate-js/view.js'
+import { Overlayer } from 'foliate-js/overlayer.js'
+import type { RelocateDetail, TocItem, View, ViewAnnotation } from 'foliate-js/view.js'
+import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import { epubCss } from '../comfort/epubCss'
 import type { ComfortSettings } from '../comfort/settings'
@@ -21,6 +23,11 @@ export class EpubEngine implements ReaderEngine {
   #callbacks: EngineCallbacks
   #lastCss = ''
   #animateSwipes = true
+  #theme: ThemeColors | null = null
+  /** subrayados por CFI */
+  #annotations = new Map<string, AnnotationRecord>()
+  #annotationTapAt = 0
+  #hadSelection = false
 
   constructor(callbacks: EngineCallbacks) {
     this.#callbacks = callbacks
@@ -35,7 +42,24 @@ export class EpubEngine implements ReaderEngine {
 
     await view.open(file)
     view.addEventListener('relocate', e => this.#onRelocate((e as CustomEvent<RelocateDetail>).detail))
-    view.addEventListener('load', e => this.#attach((e as CustomEvent<{ doc: Document }>).detail.doc))
+    view.addEventListener('load', e => {
+      const { doc, index } = (e as CustomEvent<{ doc: Document; index: number }>).detail
+      this.#attach(doc, index)
+    })
+    // subrayados: foliate pide dibujarlos al cargar cada capítulo
+    view.addEventListener('draw-annotation', e => {
+      const { draw, annotation } = (e as CustomEvent<{ draw: (fn: unknown, opts: unknown) => void; annotation: ViewAnnotation }>).detail
+      const record = this.#annotations.get(annotation.value)
+      if (record && this.#theme) draw(Overlayer.highlight, { color: this.#theme.highlights[record.color] })
+    })
+    view.addEventListener('create-overlay', () => this.#drawAll())
+    view.addEventListener('show-annotation', e => {
+      const { value, range } = (e as CustomEvent<{ value: string; range: Range }>).detail
+      const record = this.#annotations.get(value)
+      if (!record) return
+      this.#annotationTapAt = performance.now()
+      this.#callbacks.onAnnotationTap(record.id, this.#toViewport(range))
+    })
     this.apply(settings, theme, viewOptions)
     await view.init({ lastLocation: location ?? null })
   }
@@ -43,6 +67,10 @@ export class EpubEngine implements ReaderEngine {
   apply(s: ComfortSettings, t: ThemeColors, v: ViewOptions) {
     const r = this.#view?.renderer
     if (!r) return
+    this.#theme = t
+    // los colores de subrayado ya traen su transparencia
+    this.#view!.style.setProperty('--overlayer-highlight-opacity', '1')
+    this.#view!.style.setProperty('--overlayer-highlight-blend-mode', t.dark ? 'normal' : 'multiply')
     // en modo libro cada columna es una página del libro abierto
     const attrs: Record<string, string> = v.bookMode
       ? {
@@ -129,6 +157,31 @@ export class EpubEngine implements ReaderEngine {
     }
   }
 
+  setAnnotations(list: AnnotationRecord[], theme: ThemeColors) {
+    this.#theme = theme
+    const next = new Map(list.filter(a => !a.deleted).map(a => [a.anchor, a]))
+    for (const cfi of this.#annotations.keys()) if (!next.has(cfi)) this.#view?.deleteAnnotation({ value: cfi }).catch(() => {})
+    this.#annotations = next
+    this.#drawAll()
+  }
+
+  clearSelection() {
+    this.#hadSelection = false
+    for (const { doc } of this.#view?.renderer.getContents() ?? []) doc.getSelection()?.removeAllRanges()
+  }
+
+  #drawAll() {
+    // foliate ignora los que no son del capítulo cargado
+    for (const cfi of this.#annotations.keys()) this.#view?.addAnnotation({ value: cfi }).catch(() => {})
+  }
+
+  #toViewport(range: Range) {
+    const r = range.getBoundingClientRect()
+    const frame = range.startContainer.ownerDocument?.defaultView?.frameElement
+    const f = frame?.getBoundingClientRect()
+    return new DOMRect(r.left + (f?.left ?? 0), r.top + (f?.top ?? 0), r.width, r.height)
+  }
+
   destroy() {
     this.#view?.close()
     this.#view?.remove()
@@ -145,8 +198,29 @@ export class EpubEngine implements ReaderEngine {
   }
 
   /** Los toques y teclas ocurren dentro del iframe del libro; se pasan a la interfaz. */
-  #attach(doc: Document) {
+  #attach(doc: Document, index: number) {
     doc.addEventListener('keydown', e => this.#callbacks.onKey(e))
+    // selección de texto para subrayar (con ratón, teclado o las manijas de Android)
+    const checkSelection = () => {
+      const sel = doc.getSelection()
+      const text = sel?.toString().trim()
+      if (!sel || sel.isCollapsed || !sel.rangeCount || !text) {
+        if (this.#hadSelection) {
+          this.#hadSelection = false
+          this.#callbacks.onSelect(null)
+        }
+        return
+      }
+      const range = sel.getRangeAt(0)
+      this.#hadSelection = true
+      this.#callbacks.onSelect({ text, rect: this.#toViewport(range), anchor: this.#view!.getCFI(index, range) })
+    }
+    let selTimer: ReturnType<typeof setTimeout> | undefined
+    doc.addEventListener('selectionchange', () => {
+      clearTimeout(selTimer)
+      selTimer = setTimeout(checkSelection, 350)
+    })
+    doc.addEventListener('pointerup', () => setTimeout(checkSelection, 10))
     doc.addEventListener('wheel', e => this.#callbacks.onWheel(e), { passive: true })
     // al arrastrar con el dedo, foliate desliza la página siguiendo el dedo
     doc.addEventListener(
@@ -161,7 +235,12 @@ export class EpubEngine implements ReaderEngine {
       const frame = doc.defaultView?.frameElement
       if (!frame) return
       const rect = frame.getBoundingClientRect()
-      this.#callbacks.onTap(rect.left + e.clientX, rect.top + e.clientY)
+      const x = rect.left + e.clientX
+      const y = rect.top + e.clientY
+      // si el toque fue sobre un subrayado, foliate lo avisa justo después: ese no pasa página
+      setTimeout(() => {
+        if (performance.now() - this.#annotationTapAt > 80) this.#callbacks.onTap(x, y)
+      })
     })
   }
 }

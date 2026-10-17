@@ -1,0 +1,223 @@
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import type { AnnotationRecord, HighlightColor } from '../../library/db'
+import { isTouchDevice, platform } from '../../platform'
+import { Icon } from '../../ui/Icon'
+import type { ThemeColors } from '../comfort/contrast'
+
+export const HIGHLIGHT_COLORS: { id: HighlightColor; label: string }[] = [
+  { id: 'amarillo', label: 'Amarillo' },
+  { id: 'verde', label: 'Verde' },
+  { id: 'azul', label: 'Azul' },
+  { id: 'rosa', label: 'Rosa' },
+  { id: 'lila', label: 'Lila' },
+]
+
+const MENU_W = 300
+
+/** Coloca un menú flotante encima (o debajo) del texto, sin salirse de la pantalla. */
+function floatingStyle(rect: DOMRect, height = 52): CSSProperties {
+  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - MENU_W / 2), window.innerWidth - MENU_W - 8)
+  // en pantallas táctiles Android pone su propio menú arriba: el nuestro va abajo
+  const below = isTouchDevice || rect.top < height + 70
+  const top = below ? Math.min(rect.bottom + 12, window.innerHeight - height - 12) : rect.top - height - 10
+  return { left, top, width: MENU_W }
+}
+
+function ColorDots({ theme, current, onPick }: { theme: ThemeColors; current?: HighlightColor; onPick(c: HighlightColor): void }) {
+  return (
+    <div className="color-dots">
+      {HIGHLIGHT_COLORS.map(c => (
+        <button
+          key={c.id}
+          className="color-dot"
+          data-on={current === c.id}
+          style={{ background: theme.highlights[c.id] }}
+          title={c.label}
+          aria-label={`Subrayar en ${c.label.toLowerCase()}`}
+          onClick={() => onPick(c.id)}
+        />
+      ))}
+    </div>
+  )
+}
+
+interface SelectionMenuProps {
+  rect: DOMRect
+  text: string
+  theme: ThemeColors
+  onHighlight(color: HighlightColor): void
+  onNote(): void
+}
+
+/** Aparece al seleccionar texto: subrayar en un color, agregar nota o copiar. */
+export function SelectionMenu({ rect, text, theme, onHighlight, onNote }: SelectionMenuProps) {
+  return (
+    <div className="float-menu" style={floatingStyle(rect)} role="toolbar" aria-label="Subrayar">
+      <ColorDots theme={theme} onPick={onHighlight} />
+      <span className="float-sep" />
+      <button className="float-action" onClick={onNote} title="Agregar nota">
+        <Icon name="note" size={19} />
+      </button>
+      <button className="float-action" onClick={() => navigator.clipboard?.writeText(text)} title="Copiar">
+        <Icon name="copy" size={19} />
+      </button>
+    </div>
+  )
+}
+
+interface PopoverProps {
+  annotation: AnnotationRecord
+  rect: DOMRect
+  theme: ThemeColors
+  onColor(color: HighlightColor): void
+  onEditNote(): void
+  onDelete(): void
+}
+
+/** Al tocar un subrayado: cambiar color, ver o editar la nota, borrar. */
+export function AnnotationPopover({ annotation, rect, theme, onColor, onEditNote, onDelete }: PopoverProps) {
+  const height = annotation.note ? 110 : 52
+  return (
+    <div className="float-menu column" style={floatingStyle(rect, height)} role="dialog" aria-label="Subrayado">
+      <div className="float-row">
+        <ColorDots theme={theme} current={annotation.color} onPick={onColor} />
+        <span className="float-sep" />
+        <button className="float-action" onClick={onEditNote} title={annotation.note ? 'Editar nota' : 'Agregar nota'}>
+          <Icon name="note" size={19} />
+        </button>
+        <button className="float-action" onClick={onDelete} title="Borrar subrayado">
+          <Icon name="trash" size={19} />
+        </button>
+      </div>
+      {annotation.note && <p className="float-note">{annotation.note}</p>}
+    </div>
+  )
+}
+
+interface NoteEditorProps {
+  annotation: AnnotationRecord
+  onSave(note: string): void
+  onClose(): void
+}
+
+export function NoteEditor({ annotation, onSave, onClose }: NoteEditorProps) {
+  const [note, setNote] = useState(annotation.note ?? '')
+  const area = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => area.current?.focus(), [])
+  return (
+    <div className="note-backdrop" onClick={onClose}>
+      <div className="note-editor" role="dialog" aria-label="Nota" onClick={e => e.stopPropagation()}>
+        <blockquote>{annotation.text}</blockquote>
+        <textarea
+          ref={area}
+          value={note}
+          placeholder="Escribe tu nota…"
+          rows={5}
+          onChange={e => setNote(e.target.value)}
+          onKeyDown={e => {
+            e.stopPropagation()
+            if (e.key === 'Escape') onClose()
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onSave(note.trim())
+          }}
+        />
+        <div className="note-actions">
+          <button className="reader-pill" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="reader-pill primary" onClick={() => onSave(note.trim())}>
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function annotationsToMarkdown(title: string, author: string, list: AnnotationRecord[]) {
+  const lines = [`# ${title}`, author ? `*${author}*` : '', '']
+  let chapter: string | undefined
+  for (const a of list) {
+    if (a.chapter && a.chapter !== chapter) {
+      chapter = a.chapter
+      lines.push(`## ${chapter}`, '')
+    }
+    lines.push(...a.text.split('\n').map(l => `> ${l}`))
+    if (a.note) lines.push('', a.note)
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+interface NotesPanelProps {
+  title: string
+  author: string
+  annotations: AnnotationRecord[]
+  theme: ThemeColors
+  onGo(a: AnnotationRecord): void
+  onEdit(a: AnnotationRecord): void
+  onDelete(a: AnnotationRecord): void
+  onClose(): void
+}
+
+export function NotesPanel({ title, author, annotations, theme, onGo, onEdit, onDelete, onClose }: NotesPanelProps) {
+  const [copied, setCopied] = useState(false)
+  const markdown = () => annotationsToMarkdown(title, author, annotations)
+  const copy = async () => {
+    await navigator.clipboard?.writeText(markdown())
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1800)
+  }
+  const save = () => {
+    const url = URL.createObjectURL(new Blob([markdown()], { type: 'text/markdown' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title} - notas.md`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+  }
+  return (
+    <aside className="reader-panel notes-panel" role="dialog" aria-label="Subrayados y notas">
+      <header className="panel-header">
+        <h2>Subrayados y notas</h2>
+        <button className="panel-close" onClick={onClose} aria-label="Cerrar">
+          <Icon name="close" />
+        </button>
+      </header>
+      {annotations.length === 0 ? (
+        <p className="panel-hint">Selecciona un texto y elige un color para subrayarlo. Tus subrayados y notas aparecerán aquí.</p>
+      ) : (
+        <>
+          <div className="notes-export">
+            <button className="reader-pill" onClick={copy}>
+              {copied ? 'Copiado' : 'Copiar como Markdown'}
+            </button>
+            {platform.kind !== 'android' && (
+              <button className="reader-pill" onClick={save}>
+                Guardar .md
+              </button>
+            )}
+          </div>
+          <ol className="notes-list">
+            {annotations.map(a => (
+              <li key={a.id} style={{ '--mark': theme.highlights[a.color] } as CSSProperties}>
+                <button className="note-go" onClick={() => onGo(a)}>
+                  {a.chapter && <span className="note-chapter">{a.chapter}</span>}
+                  <span className="note-text">{a.text}</span>
+                  {a.note && <span className="note-body">{a.note}</span>}
+                </button>
+                <div className="note-tools">
+                  <button onClick={() => onEdit(a)} title={a.note ? 'Editar nota' : 'Agregar nota'} aria-label="Nota">
+                    <Icon name="note" size={18} />
+                  </button>
+                  <button onClick={() => onDelete(a)} title="Borrar" aria-label="Borrar">
+                    <Icon name="trash" size={18} />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </aside>
+  )
+}
