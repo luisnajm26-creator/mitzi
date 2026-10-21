@@ -55,6 +55,8 @@ export interface EngineCallbacks {
    * entonces el motor no hace su propio desplazamiento ni selecciona texto.
    */
   onPointer(e: PointerInfo): boolean
+  /** Pellizco con dos dedos: `scale` respecto al comienzo; `done` al soltar. */
+  onPinch?(scale: number, done: boolean): void
 }
 
 /** Cómo se muestra el libro: en PC/tablet horizontal, como libro abierto de dos páginas. */

@@ -1366,3 +1366,29 @@
   mix-blend-mode: screen;
   opacity: 0.05;
 }
+
+/* ---------- gestos: pellizcar (letra) y borde izquierdo (brillo) ---------- */
+.gesture-bubble {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--r-fg);
+  background: color-mix(in srgb, var(--r-surface) 94%, transparent);
+  border: 1px solid var(--r-border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.gesture-bubble.left {
+  left: 72px;
+  transform: translate(0, -50%);
+}

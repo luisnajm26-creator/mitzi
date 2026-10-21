@@ -52,6 +52,11 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [panel, setPanel] = useState<Panel>(null)
   const [annotations, setAnnotations] = useState<AnnotationRecord[]>([])
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([])
+  /** tamaño de letra mientras se pellizca (se aplica al soltar) */
+  const [pinchSize, setPinchSize] = useState<number | null>(null)
+  /** brillo mientras se desliza el borde izquierdo */
+  const [brightnessPreview, setBrightnessPreview] = useState<number | null>(null)
+  const brightnessGesture = useRef<{ y: number; start: number; value: number } | null>(null)
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [tapped, setTapped] = useState<{ id: string; rect: DOMRect } | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -142,6 +147,25 @@ export default function Reader({ bookId }: { bookId: string }) {
    * deslizando a un lado en cualquier parte. Al soltar termina de girar o vuelve.
    */
   const onPointer = (e: PointerInfo): boolean => {
+    // brillo: deslizar arriba o abajo desde el borde izquierdo (teléfono y tablet)
+    if (e.pointerType === 'touch') {
+      const b = brightnessGesture.current
+      if (e.type === 'down' && e.x < 28 && !latest.current.panel) {
+        brightnessGesture.current = { y: e.y, start: latest.current.settings.brightness, value: latest.current.settings.brightness }
+        return true
+      }
+      if (b) {
+        if (e.type === 'move') {
+          b.value = Math.min(1, Math.max(0.3, b.start - (e.y - b.y) / (window.innerHeight * 0.6)))
+          setBrightnessPreview(b.value)
+        } else {
+          brightnessGesture.current = null
+          setBrightnessPreview(null)
+          if (b.value !== b.start) useReaderSettings.getState().update({ brightness: b.value }, bookId)
+        }
+        return true
+      }
+    }
     const engine = engineRef.current
     const flip = flipRef.current
     const stage = stageRef.current?.getBoundingClientRect()
@@ -254,6 +278,13 @@ export default function Reader({ bookId }: { bookId: string }) {
       onWheel: e => actions.current.wheel(e),
       onSwipe: dir => turn(dir),
       onPointer: e => onPointerRef.current(e),
+      onPinch(scale, done) {
+        const base = latest.current.settings.fontSize
+        const size = Math.min(36, Math.max(12, Math.round(base * scale)))
+        if (!done) return setPinchSize(size)
+        setPinchSize(null)
+        if (size !== base) useReaderSettings.getState().update({ fontSize: size }, bookId)
+      },
       onSelect: sel => {
         setSelection(sel)
         if (sel) setTapped(null)
@@ -734,7 +765,17 @@ export default function Reader({ bookId }: { bookId: string }) {
       )}
       {panel === 'comfort' && book && <ComfortPanel bookId={bookId} format={isReflowable(book.format) ? 'epub' : 'pdf'} onClose={() => setPanel(null)} />}
 
-      <div className="reader-dim" style={{ opacity: (1 - settings.brightness) * 0.9 }} aria-hidden />
+      <div className="reader-dim" style={{ opacity: (1 - (brightnessPreview ?? settings.brightness)) * 0.9 }} aria-hidden />
+      {pinchSize !== null && (
+        <div className="gesture-bubble" role="status">
+          <Icon name="text" size={18} /> {pinchSize} px
+        </div>
+      )}
+      {brightnessPreview !== null && (
+        <div className="gesture-bubble left" role="status">
+          <Icon name="sun" size={18} /> {Math.round(brightnessPreview * 100)}%
+        </div>
+      )}
       <div className="reader-warm" style={{ opacity: settings.warmth * 0.3 }} aria-hidden />
     </div>
   )

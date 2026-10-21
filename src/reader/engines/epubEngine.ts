@@ -60,6 +60,8 @@ export class EpubEngine implements ReaderEngine {
   #lang: string | undefined
   /** secciones con las que termina un capítulo del índice */
   #chapterEnds = new Set<number>()
+  /** pellizco en curso (distancia inicial entre los dedos) */
+  #pinch: { start: number; scale: number } | null = null
 
   constructor(callbacks: EngineCallbacks) {
     this.#callbacks = callbacks
@@ -338,7 +340,8 @@ export class EpubEngine implements ReaderEngine {
     // arrastrar la hoja: los gestos se pasan a Mitzi en coordenadas de la ventana
     const forward = (type: PointerInfo['type'], e: PointerEvent) => {
       const rect = doc.defaultView?.frameElement?.getBoundingClientRect()
-      if (!rect) return false
+      // con dos dedos es un pellizco (tamaño de letra), no pasar página
+      if (!rect || this.#pinch) return false
       return this.#callbacks.onPointer({ type, x: rect.left + e.clientX, y: rect.top + e.clientY, pointerType: e.pointerType })
     }
     doc.addEventListener('pointerdown', e => forward('down', e) && e.preventDefault(), true)
@@ -347,15 +350,44 @@ export class EpubEngine implements ReaderEngine {
       if (forward('up', e)) this.#suppressClickAt = performance.now()
     }, true)
     doc.addEventListener('pointercancel', e => forward('cancel', e), true)
-    // con la hoja activa, foliate no debe deslizar la página por su cuenta
+    // pellizcar con dos dedos cambia el tamaño de la letra (se aplica al soltar)
+    const spread = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+    doc.addEventListener(
+      'touchstart',
+      e => {
+        if (e.touches.length !== 2 || this.#view?.isFixedLayout) return
+        this.#pinch = { start: spread(e.touches), scale: 1 }
+        // si el primer dedo ya había empezado a llevar la hoja, se suelta
+        this.#callbacks.onPointer({ type: 'cancel', x: 0, y: 0, pointerType: 'touch' })
+      },
+      { capture: true, passive: true },
+    )
+    doc.addEventListener(
+      'touchmove',
+      e => {
+        if (!this.#pinch || e.touches.length !== 2) return
+        this.#pinch.scale = spread(e.touches) / this.#pinch.start
+        this.#callbacks.onPinch?.(this.#pinch.scale, false)
+      },
+      { capture: true, passive: true },
+    )
+    const endPinch = (e: TouchEvent) => {
+      if (!this.#pinch || e.touches.length >= 2) return
+      this.#callbacks.onPinch?.(this.#pinch.scale, true)
+      this.#pinch = null
+    }
+    doc.addEventListener('touchend', endPinch, { capture: true, passive: true })
+    doc.addEventListener('touchcancel', endPinch, { capture: true, passive: true })
+    // con la hoja activa, foliate no debe deslizar la página por su cuenta (va después del
+    // pellizco: stopImmediatePropagation cortaría las escuchas que se registren detrás)
     const blockTouch = (e: TouchEvent) => {
       if (this.#flipEnabled) e.stopImmediatePropagation()
     }
     doc.addEventListener('touchstart', blockTouch, { capture: true, passive: true })
     doc.addEventListener('touchmove', blockTouch, { capture: true, passive: true })
     doc.addEventListener('touchend', blockTouch, { capture: true, passive: true })
-    // lo horizontal es para pasar página; lo vertical y el zoom quedan para el sistema
-    doc.documentElement.style.touchAction = 'pan-y pinch-zoom'
+    // lo horizontal es para pasar página, lo vertical para el sistema; el pellizco es de Mitzi
+    doc.documentElement.style.touchAction = 'pan-y'
 
     doc.addEventListener('click', e => {
       if (e.defaultPrevented) return // enlaces: los maneja foliate
