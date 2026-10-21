@@ -32,5 +32,6 @@ export const CREDITS: { name: string; what: string; license: string; url: string
   { name: 'Capacitor', what: 'App de Android', license: 'MIT', url: 'https://capacitorjs.com' },
   { name: 'Capacitor Text to Speech', what: 'Voz en Android', license: 'MIT', url: 'https://github.com/capacitor-community/text-to-speech' },
   { name: '@noble/hashes', what: 'Huella de cada libro', license: 'MIT', url: 'https://github.com/paulmillr/noble-hashes' },
+  { name: 'hyphen', what: 'Separación silábica (patrones de hyph-utf8)', license: 'ISC', url: 'https://github.com/ytiurin/hyphen' },
   { name: 'Literata, Merriweather, Nunito, Atkinson Hyperlegible, OpenDyslexic', what: 'Fuentes', license: 'OFL-1.1', url: 'https://fontsource.org' },
 ]

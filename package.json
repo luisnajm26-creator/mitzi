@@ -34,6 +34,7 @@
     "@noble/hashes": "^2.4.0",
     "@react-three/fiber": "^9.8.2",
     "dexie": "^4.4.6",
+    "hyphen": "^1.14.1",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

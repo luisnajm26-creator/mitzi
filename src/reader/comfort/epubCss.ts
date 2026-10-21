@@ -7,7 +7,8 @@ const TEXT_ELEMENTS = 'p, div, span, li, dd, dt, blockquote, h1, h2, h3, h4, h5,
 /** CSS que se inyecta dentro del EPUB para aplicar tema y tipografía. */
 export function epubCss(s: ComfortSettings, t: ThemeColors) {
   const family = fontStack(s.fontId)
-  const hyphens = s.hyphenate ? 'auto' : 'manual'
+  // Mitzi inserta guiones suaves siempre (ver engines/hyphenate.ts): «none» los ignora
+  const hyphens = s.hyphenate ? 'auto' : 'none'
   return `
 ${fontFaceCss(s.fontId)}
 @namespace epub "http://www.idpf.org/2007/ops";

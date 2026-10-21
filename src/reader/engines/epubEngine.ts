@@ -7,6 +7,7 @@ import { epubCss } from '../comfort/epubCss'
 import type { ComfortSettings } from '../comfort/settings'
 import { GhostPages } from '../pageTurn/epubGhost'
 import { createEpubSpeech } from '../tts/epubSpeech'
+import { hyphenateDocument, prepareHyphenation, withoutSoftHyphens } from './hyphenate'
 import { setupPlate } from './plates'
 import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, SearchResult, TocEntry, ViewOptions } from './types'
 
@@ -37,6 +38,8 @@ export class EpubEngine implements ReaderEngine {
   #annotations = new Map<string, AnnotationRecord>()
   #annotationTapAt = 0
   #hadSelection = false
+  /** idioma del libro (para la separación silábica) */
+  #lang: string | undefined
 
   constructor(callbacks: EngineCallbacks) {
     this.#callbacks = callbacks
@@ -50,6 +53,10 @@ export class EpubEngine implements ReaderEngine {
     this.#view = view
 
     await view.open(file)
+    // patrones de separación silábica del idioma del libro, listos antes del primer capítulo
+    const md = view.book.metadata
+    this.#lang = Array.isArray(md?.language) ? md.language[0] : md?.language
+    if (!view.isFixedLayout) await prepareHyphenation(this.#lang)
     view.addEventListener('relocate', e => this.#onRelocate((e as CustomEvent<RelocateDetail>).detail))
     view.addEventListener('load', e => {
       const { doc, index } = (e as CustomEvent<{ doc: Document; index: number }>).detail
@@ -278,12 +285,13 @@ export class EpubEngine implements ReaderEngine {
   /** Los toques y teclas ocurren dentro del iframe del libro; se pasan a la interfaz. */
   #attach(doc: Document, index: number) {
     // páginas que son solo una ilustración: a página completa (o doble, si es horizontal)
+    if (!this.#view?.isFixedLayout) hyphenateDocument(doc, this.#lang)
     setupPlate(doc)
     doc.addEventListener('keydown', e => this.#callbacks.onKey(e))
     // selección de texto para subrayar (con ratón, teclado o las manijas de Android)
     const checkSelection = () => {
       const sel = doc.getSelection()
-      const text = sel?.toString().trim()
+      const text = withoutSoftHyphens(sel?.toString() ?? '').trim()
       if (!sel || sel.isCollapsed || !sel.rangeCount || !text) {
         if (this.#hadSelection) {
           this.#hadSelection = false

@@ -1,4 +1,5 @@
 import type { View } from 'foliate-js/view.js'
+import { withoutSoftHyphens } from '../engines/hyphenate'
 import type { SpeechSource } from '../engines/types'
 
 interface Segment {
@@ -13,7 +14,8 @@ function parseSsml(ssml: string | undefined): Segment[] {
   const out: Segment[] = []
   let current: Segment = { mark: null, text: '' }
   const flush = () => {
-    const text = current.text.replace(/\s+/g, ' ').trim()
+    // sin los guiones suaves de la separación silábica
+    const text = withoutSoftHyphens(current.text).replace(/\s+/g, ' ').trim()
     if (text) out.push({ mark: current.mark, text })
   }
   const walk = (node: Node) => {
