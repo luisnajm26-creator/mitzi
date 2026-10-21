@@ -1,4 +1,5 @@
 import { Icon } from '../ui/Icon'
+import { platform } from '../platform'
 import { deriveTheme } from './comfort/contrast'
 import { FONT_IDS, FONTS } from './comfort/fonts'
 import { effectiveSettings, useReaderSettings, type ComfortSettings } from './comfort/settings'
@@ -139,6 +140,16 @@ export function ComfortPanel({ bookId, format, onClose }: Props) {
           checked={s.animatePages}
           onChange={v => set({ animatePages: v })}
         />
+        <Toggle label="Sonido de papel" hint="Un roce suave al pasar página" checked={s.pageSound} onChange={v => set({ pageSound: v })} />
+        {platform.kind === 'android' && (
+          <Toggle label="Vibración al pasar página" hint="Un toque muy leve" checked={s.haptics} onChange={v => set({ haptics: v })} />
+        )}
+        {epub && (
+          <>
+            <Toggle label="Textura de papel" hint="Un grano sutil sobre las páginas" checked={s.paperTexture} onChange={v => set({ paperTexture: v })} />
+            <Toggle label="Adorno al final de cada capítulo" checked={s.chapterOrnament} onChange={v => set({ chapterOrnament: v })} />
+          </>
+        )}
       </Section>
 
       <Section title="Comodidad">

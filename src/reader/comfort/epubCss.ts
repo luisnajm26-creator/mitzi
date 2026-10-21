@@ -52,6 +52,17 @@ a:link, a:visited { color: ${t.link} !important; }
 ::selection { background: ${t.selection}; }
 ::highlight(mitzi-tts) { background-color: ${t.highlights.azul}; }
 pre { white-space: pre-wrap !important; }
+${s.chapterOrnament ? `html.mitzi-chapter body::after {
+  content: '';
+  display: block;
+  width: 4.2em;
+  height: 0.8em;
+  margin: 2.4em auto 0.6em;
+  background-color: ${t.muted};
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 12'%3E%3Cpath d='M0 6Q12 0 26 6Q12 12 0 6ZM38 6Q52 0 64 6Q52 12 38 6ZM32 2l4 4-4 4-4-4Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 12'%3E%3Cpath d='M0 6Q12 0 26 6Q12 12 0 6ZM38 6Q52 0 64 6Q52 12 38 6ZM32 2l4 4-4 4-4-4Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: 0.7;
+}` : ''}
 hr { border-color: ${t.border} !important; }
 ${t.dark ? 'img, svg, image, video { filter: brightness(0.86) contrast(1.04); }' : ''}
 aside[epub|type~="endnote"],

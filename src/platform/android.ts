@@ -12,6 +12,7 @@ interface MitziLibraryPlugin {
   setHighRefresh(options: { on: boolean }): Promise<void>
   openUrl(options: { url: string }): Promise<void>
   processText(options: { text: string }): Promise<{ handled: boolean }>
+  haptic(): Promise<void>
   installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
   addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
@@ -74,6 +75,7 @@ export function createAndroidPlatform(): Platform {
     },
     importDropped: async () => 0,
     openExternal: url => void Library.openUrl({ url }).catch(() => {}),
+    haptic: () => void Library.haptic().catch(() => {}),
     lookupText: text =>
       Library.processText({ text })
         .then(r => r.handled)

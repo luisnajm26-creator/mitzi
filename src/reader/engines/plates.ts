@@ -62,6 +62,7 @@ html.${PLATE} body { margin: 0 !important; padding: 0 !important; }
   page-break-before: auto !important; page-break-after: auto !important;
 }
 .${HIDE} { display: none !important; }
+html.${PLATE} body::after { content: none !important; }
 .${TARGET} { box-sizing: border-box !important; }
 `
 

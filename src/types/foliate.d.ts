@@ -34,6 +34,8 @@ declare module 'foliate-js/view.js' {
     rendition?: { layout?: string }
     getCover?(): Promise<Blob | null>
     loadBlob?(path: string): Promise<Blob>
+    /** a qué sección (índice) lleva un enlace del índice */
+    resolveHref?(href: string): { index: number } | null
   }
 
   export interface RelocateDetail {

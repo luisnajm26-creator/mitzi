@@ -12,6 +12,7 @@ import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.provider.DocumentsContract.Document;
 import android.view.Display;
+import android.view.HapticFeedbackConstants;
 import android.view.Window;
 import android.view.WindowManager;
 import androidx.activity.result.ActivityResult;
@@ -326,6 +327,16 @@ public class MitziLibraryPlugin extends Plugin {
         getActivity().startActivity(chooser);
         ret.put("handled", true);
         call.resolve(ret);
+    }
+
+    /** Un toque de vibración muy leve (respeta la configuración del teléfono; no pide permisos). */
+    @PluginMethod
+    public void haptic(PluginCall call) {
+        getActivity()
+            .runOnUiThread(() -> {
+                getBridge().getWebView().performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                call.resolve();
+            });
     }
 
     // ---------- actualizaciones ----------

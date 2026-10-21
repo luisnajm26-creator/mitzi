@@ -23,6 +23,24 @@ const flattenToc = (items: TocItem[] | null | undefined, depth = 0): TocEntry[] 
 const BOOK_PAGE_ASPECT = 0.66
 
 /** EPUB con foliate-js: paginación en columnas, CFI y estilos inyectados. */
+/** Secciones con las que termina cada capítulo: las anteriores a donde empieza uno del índice. */
+function chapterEnds(view: View) {
+  const book = view.book
+  const starts = new Set<number>()
+  const walk = (items: TocItem[] | null | undefined) => {
+    for (const item of items ?? []) {
+      const index = item.href ? book.resolveHref?.(item.href)?.index : undefined
+      if (index !== undefined && index > 0) starts.add(index)
+      walk(item.subitems)
+    }
+  }
+  walk(book.toc)
+  const ends = new Set([...starts].map(i => i - 1))
+  // y la última sección con texto del libro
+  ends.add(book.sections.length - 1)
+  return ends
+}
+
 export class EpubEngine implements ReaderEngine {
   readonly format = 'epub' as const
   #view: View | null = null
@@ -40,6 +58,8 @@ export class EpubEngine implements ReaderEngine {
   #hadSelection = false
   /** idioma del libro (para la separación silábica) */
   #lang: string | undefined
+  /** secciones con las que termina un capítulo del índice */
+  #chapterEnds = new Set<number>()
 
   constructor(callbacks: EngineCallbacks) {
     this.#callbacks = callbacks
@@ -57,6 +77,7 @@ export class EpubEngine implements ReaderEngine {
     const md = view.book.metadata
     this.#lang = Array.isArray(md?.language) ? md.language[0] : md?.language
     if (!view.isFixedLayout) await prepareHyphenation(this.#lang)
+    this.#chapterEnds = chapterEnds(view)
     view.addEventListener('relocate', e => this.#onRelocate((e as CustomEvent<RelocateDetail>).detail))
     view.addEventListener('load', e => {
       const { doc, index } = (e as CustomEvent<{ doc: Document; index: number }>).detail
@@ -286,6 +307,9 @@ export class EpubEngine implements ReaderEngine {
   #attach(doc: Document, index: number) {
     // páginas que son solo una ilustración: a página completa (o doble, si es horizontal)
     if (!this.#view?.isFixedLayout) hyphenateDocument(doc, this.#lang)
+    // adorno al final de cada capítulo: la sección justo antes de donde empieza el siguiente
+    // del índice (los libros suelen partir un capítulo en varios archivos)
+    doc.documentElement.classList.toggle('mitzi-chapter', this.#chapterEnds.has(index) && (doc.body?.textContent?.trim().length ?? 0) > 200)
     setupPlate(doc)
     doc.addEventListener('keydown', e => this.#callbacks.onKey(e))
     // selección de texto para subrayar (con ratón, teclado o las manijas de Android)

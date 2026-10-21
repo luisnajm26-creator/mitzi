@@ -141,7 +141,10 @@ export class PageFlip {
   #pendingRelease = false
   #resolve: (() => void) | null = null
   #queue: Promise<void> = Promise.resolve()
-  onFinish: (() => void) | null = null
+  /** la hoja empieza a moverse (para el sonido de papel) */
+  onStart: (() => void) | null = null
+  /** terminó el giro; `turned` es false si la hoja volvió a su lugar */
+  onFinish: ((turned: boolean) => void) | null = null
 
   constructor(under: HTMLElement, over: HTMLElement) {
     this.#under = under
@@ -183,6 +186,7 @@ export class PageFlip {
       // en desarrollo se puede ralentizar para revisarla: window.__mitziFlipSlow = 10
       const slow = import.meta.env.DEV ? Number((window as { __mitziFlipSlow?: number }).__mitziFlipSlow ?? 1) : 1
       this.#auto = { start: performance.now(), duration: (ctx.book ? 720 : 560) * slow, from: s.reverse ? 1 : 0, to: s.reverse ? 0 : 1 }
+      this.onStart?.()
       await this.#run('auto')
     }).catch(e => console.warn('No se pudo animar la página', e))
     return this.#queue
@@ -201,6 +205,7 @@ export class PageFlip {
     const from = s.reverse ? s.end : s.corner
     this.#grab = { x: from.x - p.x, y: from.y - p.y }
     this.#target = { ...from }
+    this.onStart?.()
     const run = this.#run('drag')
     if (this.#pendingRelease) this.endDrag()
     await run
@@ -427,7 +432,7 @@ export class PageFlip {
     this.#setup = null
     this.#resolve?.()
     this.#resolve = null
-    this.onFinish?.()
+    this.onFinish?.(this.#complete)
   }
 
   #hide() {

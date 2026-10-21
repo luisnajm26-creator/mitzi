@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { formatMinutes, paceFactor, resetPaceSession, trackPace } from './pace'
 import { SearchPanel } from './SearchPanel'
+import { playPaperSound } from './paperSound'
 import { isReflowable } from '../library/formats'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
@@ -373,7 +374,12 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (flipUnderRef.current && flipOverRef.current) {
       const flip = new PageFlip(flipUnderRef.current, flipOverRef.current)
       // tras cada giro, las copias del capítulo se preparan para el siguiente
-      flip.onFinish = () => engineRef.current?.prewarm(flip.slotsFor(latest.current.view.bookMode))
+      flip.onStart = () => latest.current.settings.pageSound && playPaperSound()
+      flip.onFinish = turned => {
+        // una vibración muy leve cuando la hoja cae (teléfono)
+        if (turned && latest.current.settings.haptics) platform.haptic?.()
+        engineRef.current?.prewarm(flip.slotsFor(latest.current.view.bookMode))
+      }
       flipRef.current = flip
     }
     return () => ro.disconnect()
@@ -520,6 +526,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     '--r-fg': theme.fg,
     '--r-muted': theme.muted,
     '--r-surface': theme.surface,
+    ...(book && { '--r-tint': book.palette.primary }),
     '--r-border': theme.border,
     '--r-link': theme.link,
     '--r-fill': `${fraction * 100}%`,
@@ -537,6 +544,13 @@ export default function Reader({ bookId }: { bookId: string }) {
       <div className="reader-stage" ref={stageRef} style={stageStyle} />
       <div className="flip-under" ref={flipUnderRef} aria-hidden />
       {bookGeo && <OpenBookGutter geo={bookGeo} progress={fraction} dark={theme.dark} />}
+      {settings.paperTexture && book && isReflowable(book.format) && (
+        <div
+          className="paper-grain"
+          aria-hidden
+          style={bookGeo ? { left: bookGeo.left, top: bookGeo.top, width: bookGeo.width, height: bookGeo.height } : { inset: 0 }}
+        />
+      )}
       <div className="flip-over" ref={flipOverRef} aria-hidden />
 
       {status === 'loading' && (

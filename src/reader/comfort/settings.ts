@@ -37,6 +37,14 @@ export interface ComfortSettings {
   ttsRate: number
   /** voz elegida (null = la primera del idioma del libro) */
   ttsVoice: string | null
+  /** grano de papel sobre las páginas */
+  paperTexture: boolean
+  /** adorno al final de cada capítulo */
+  chapterOrnament: boolean
+  /** sonido de papel al pasar página */
+  pageSound: boolean
+  /** vibración leve al pasar página (teléfono) */
+  haptics: boolean
 }
 
 export const DEFAULT_SETTINGS: ComfortSettings = {
@@ -63,6 +71,10 @@ export const DEFAULT_SETTINGS: ComfortSettings = {
   keepAwake: true,
   ttsRate: 1,
   ttsVoice: null,
+  paperTexture: true,
+  chapterOrnament: true,
+  pageSound: false,
+  haptics: true,
 }
 
 interface ReaderSettingsState {
