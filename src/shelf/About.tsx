@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { AUTHOR, CREDITS, REPO } from '../app/author'
 import { useBackHandler } from '../app/back'
+import { checkForUpdate, updatesSupported, useUpdates } from '../app/updates'
 import { platform } from '../platform'
 import { Icon, type IconName } from '../ui/Icon'
 
@@ -9,6 +11,29 @@ function LinkButton({ icon, label, url, primary }: { icon: IconName; label: stri
       <Icon name={icon} size={18} />
       {label}
     </button>
+  )
+}
+
+/** «Buscar actualizaciones»: pregunta ahora (sin esperar al día siguiente). */
+function UpdateCheck() {
+  const [status, setStatus] = useState<string | null>(null)
+  const found = useUpdates(s => s.info)
+  const check = async () => {
+    setStatus('Buscando…')
+    try {
+      const info = await checkForUpdate(true)
+      setStatus(info ? `Hay una versión nueva: ${info.version}. Mira el aviso en la biblioteca.` : 'Tienes la última versión.')
+    } catch {
+      setStatus('No se pudo consultar (¿sin internet?).')
+    }
+  }
+  return (
+    <div className="about-update">
+      <button className="ghost-button small" onClick={check}>
+        Buscar actualizaciones
+      </button>
+      <span>{found && !status ? `Versión ${found.version} disponible` : status}</span>
+    </div>
   )
 }
 
@@ -36,6 +61,7 @@ export function About({ onClose }: { onClose(): void }) {
           </div>
         </div>
         <p className="sheet-note">Lector de EPUB y PDF, libre y de código abierto. No trae libros: tú agregas los tuyos y Mitzi los encuentra sola.</p>
+        {updatesSupported() && <UpdateCheck />}
 
         <section className="about-card">
           <div className="about-label">Hecho por</div>

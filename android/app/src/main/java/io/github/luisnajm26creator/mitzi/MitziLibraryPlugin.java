@@ -9,11 +9,13 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.DocumentsContract;
+import android.provider.Settings;
 import android.provider.DocumentsContract.Document;
 import android.view.Display;
 import android.view.Window;
 import android.view.WindowManager;
 import androidx.activity.result.ActivityResult;
+import androidx.core.content.FileProvider;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -25,6 +27,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -269,6 +274,104 @@ public class MitziLibraryPlugin extends Plugin {
             call.resolve();
         } catch (Exception e) {
             call.reject("No hay una app para abrirlo");
+        }
+    }
+
+    // ---------- actualizaciones ----------
+
+    /** Solo se descargan archivos de las versiones publicadas de este repositorio. */
+    private static final String RELEASES = "https://github.com/luisnajm26-creator/mitzi/releases/download/";
+
+    /**
+     * Descarga el APK de una versión nueva, comprueba su huella SHA-256 contra el
+     * SHA256SUMS.txt publicado y abre el instalador del sistema. Android además solo lo
+     * instala si está firmado con la misma llave que la app actual.
+     */
+    @PluginMethod
+    public void installUpdate(PluginCall call) {
+        String url = call.getString("url", "");
+        String sumsUrl = call.getString("sumsUrl", "");
+        String name = call.getString("name", "");
+        if (!url.startsWith(RELEASES) || !sumsUrl.startsWith(RELEASES) || !name.matches("Mitzi-[0-9]+\\.[0-9]+\\.[0-9]+\\.apk")) {
+            call.reject("Dirección de actualización no permitida");
+            return;
+        }
+        // Android 8+: el usuario tiene que permitir, una vez, que Mitzi instale apps
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !getContext().getPackageManager().canRequestPackageInstalls()) {
+            Intent settings = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:" + getContext().getPackageName()));
+            settings.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(settings);
+            JSObject ret = new JSObject();
+            ret.put("status", "needs-permission");
+            call.resolve(ret);
+            return;
+        }
+        new Thread(() -> {
+            try {
+                String expected = null;
+                for (String line : readText(sumsUrl).split("\n")) {
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length == 2 && parts[1].equals(name)) expected = parts[0].toLowerCase(Locale.ROOT);
+                }
+                if (expected == null) throw new Exception("La versión no trae la huella de su APK");
+
+                File dir = new File(getContext().getCacheDir(), "actualizacion");
+                if (!dir.exists()) dir.mkdirs();
+                File[] old = dir.listFiles();
+                if (old != null) for (File f : old) f.delete();
+                File apk = new File(dir, name);
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
+                con.setInstanceFollowRedirects(true);
+                long total = con.getContentLengthLong();
+                long received = 0;
+                long lastNotice = 0;
+                try (InputStream in = con.getInputStream(); OutputStream os = new FileOutputStream(apk)) {
+                    byte[] buffer = new byte[128 * 1024];
+                    int n;
+                    while ((n = in.read(buffer)) > 0) {
+                        os.write(buffer, 0, n);
+                        digest.update(buffer, 0, n);
+                        received += n;
+                        long now = System.currentTimeMillis();
+                        if (total > 0 && now - lastNotice > 150) {
+                            lastNotice = now;
+                            JSObject progress = new JSObject();
+                            progress.put("fraction", (double) received / total);
+                            notifyListeners("updateProgress", progress);
+                        }
+                    }
+                }
+                StringBuilder hex = new StringBuilder();
+                for (byte b : digest.digest()) hex.append(String.format("%02x", b));
+                if (!hex.toString().equals(expected)) {
+                    apk.delete();
+                    throw new Exception("La descarga no coincide con la huella publicada: no se instaló");
+                }
+                Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", apk);
+                Intent install = new Intent(Intent.ACTION_VIEW);
+                install.setDataAndType(uri, "application/vnd.android.package-archive");
+                install.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+                getActivity().startActivity(install);
+                JSObject ret = new JSObject();
+                ret.put("status", "installing");
+                call.resolve(ret);
+            } catch (Exception e) {
+                call.reject(e.getMessage() != null ? e.getMessage() : "No se pudo actualizar");
+            }
+        })
+            .start();
+    }
+
+    private static String readText(String address) throws Exception {
+        HttpURLConnection con = (HttpURLConnection) new URL(address).openConnection();
+        con.setInstanceFollowRedirects(true);
+        try (InputStream in = con.getInputStream()) {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
+            return out.toString("UTF-8");
         }
     }
 

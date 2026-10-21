@@ -8,6 +8,7 @@ import { retryFailed, syncLibrary } from '../library/scanner'
 import { carouselBooks, useLibraryQuery, type CarouselFilter } from '../library/query'
 import { Explorer } from './Explorer'
 import { About } from './About'
+import { UpdateToast } from './UpdateToast'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
 import { AmbientBackground } from './AmbientBackground'
 import { CLOSE_MS, createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
@@ -239,6 +240,8 @@ export function Shelf({ active }: { active: boolean }) {
       )}
       {failedOpen && <FailedPanel onClose={() => setFailedOpen(false)} />}
       {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
+      {/* mientras se leen libros, arriba está ese aviso: este espera */}
+      {!scanning && <UpdateToast />}
       {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}
       {explorerOpen && <Explorer onClose={() => setExplorerOpen(false)} onPick={pickBook} onShowGroup={showGroup} />}
       <div

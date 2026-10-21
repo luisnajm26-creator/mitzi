@@ -22,6 +22,8 @@ const api: MitziNativeApi = {
   toggleFullscreen: () => ipcRenderer.invoke('window:toggle-fullscreen'),
   onFullscreenChanged: cb => listen<[boolean]>('window:fullscreen-changed', cb),
   keepAwake: on => ipcRenderer.invoke('power:keep-awake', on),
+  installUpdate: info => ipcRenderer.invoke('update:install', info),
+  onUpdateProgress: cb => listen<[number]>('update:progress', cb),
 }
 
 contextBridge.exposeInMainWorld('mitziNative', api)

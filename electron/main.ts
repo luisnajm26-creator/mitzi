@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, protocol, s
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { LibraryService } from './library.js'
+import { installUpdate } from './updater.js'
+import type { UpdateInfo } from '../shared/native-api.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.join(here, '..', '..')
@@ -15,7 +17,7 @@ const CSP = [
   "img-src 'self' blob: data:",
   "font-src 'self' blob: data:",
   "media-src 'self' blob: data:",
-  "connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self' blob: data: https://api.github.com https://*.supabase.co wss://*.supabase.co",
   "worker-src 'self' blob:",
   "frame-src 'self' blob:",
 ].join('; ')
@@ -97,6 +99,7 @@ function registerIpc() {
     win.setFullScreen(next)
     return next
   })
+  ipcMain.handle('update:install', (e, info: UpdateInfo) => installUpdate(info, fraction => e.sender.send('update:progress', fraction)))
   ipcMain.handle('power:keep-awake', (_e, on: boolean) => {
     if (on && wakeLockId === null) wakeLockId = powerSaveBlocker.start('prevent-display-sleep')
     if (!on && wakeLockId !== null) {

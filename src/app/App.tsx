@@ -5,6 +5,7 @@ import { refreshLibrary } from '../library/store'
 import { Shelf } from '../shelf/Shelf'
 import { handleBack } from './back'
 import { splashGone } from './splash'
+import { checkForUpdate } from './updates'
 import { useApp } from './store'
 
 const Reader = lazy(() => import('../reader/Reader'))
@@ -20,6 +21,8 @@ export function App() {
       .then(() => splashGone)
       .then(() => {
         syncLibrary()
+        // ¿hay una versión nueva publicada? (a lo sumo una vez al día; sin internet no pasa nada)
+        setTimeout(() => checkForUpdate().catch(() => {}), 4000)
         const idle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1200))
         idle(() => void import('../reader/Reader'))
       })

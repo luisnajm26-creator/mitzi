@@ -24,5 +24,16 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     keepAwake: on => api.keepAwake(on),
     // la ventana principal manda los enlaces externos al navegador (ver electron/main.ts)
     openExternal: url => void window.open(url, '_blank'),
+    async installUpdate(info, onProgress) {
+      const off = api.onUpdateProgress(onProgress)
+      try {
+        return await api.installUpdate(info)
+      } catch (e) {
+        // Electron antepone «Error invoking remote method…»: se deja solo el motivo
+        throw new Error(String(e instanceof Error ? e.message : e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+      } finally {
+        off()
+      }
+    },
   }
 }

@@ -1,6 +1,6 @@
-import type { BookFile, LibraryFolders } from '../../shared/native-api'
+import type { BookFile, LibraryFolders, UpdateInfo } from '../../shared/native-api'
 
-export type { BookFile, LibraryFolders }
+export type { BookFile, LibraryFolders, UpdateInfo }
 
 export interface ScanResult {
   files: BookFile[]
@@ -30,6 +30,11 @@ export interface Platform {
   keepAwake(on: boolean): Promise<void>
   /** Abre un enlace (https o mailto) fuera de la app: navegador o app de correo. */
   openExternal(url: string): void
+  /**
+   * Descarga una versión nueva, comprueba su huella y la instala (PC y Android).
+   * 'needs-permission': Android pidió permitir que Mitzi instale apps.
+   */
+  installUpdate?(info: UpdateInfo, onProgress: (fraction: number) => void): Promise<'installing' | 'needs-permission'>
   /** Oculta las barras del sistema (Android) para leer a pantalla completa. */
   setImmersive?(on: boolean): Promise<void>
   /** Pide la frecuencia de pantalla más alta mientras hay animación (Android). */

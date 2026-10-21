@@ -11,7 +11,9 @@ interface MitziLibraryPlugin {
   setKeepAwake(options: { on: boolean }): Promise<void>
   setHighRefresh(options: { on: boolean }): Promise<void>
   openUrl(options: { url: string }): Promise<void>
+  installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
+  addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
 }
 
 /** Plugin nativo propio (android/app/src/main/java/.../MitziLibraryPlugin.java). */
@@ -71,6 +73,15 @@ export function createAndroidPlatform(): Platform {
     },
     importDropped: async () => 0,
     openExternal: url => void Library.openUrl({ url }).catch(() => {}),
+    async installUpdate(info, onProgress) {
+      const handle = await Library.addListener('updateProgress', e => onProgress(e.fraction))
+      try {
+        const { status } = await Library.installUpdate({ url: info.url, sumsUrl: info.sumsUrl, name: info.name })
+        return status
+      } finally {
+        handle.remove()
+      }
+    },
     async toggleFullscreen() {
       await this.setImmersive?.(!immersive)
       return immersive

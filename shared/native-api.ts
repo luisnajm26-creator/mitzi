@@ -13,6 +13,18 @@ export interface LibraryFolders {
   defaultFolder: string | null
 }
 
+/** Una versión nueva publicada en GitHub Releases. */
+export interface UpdateInfo {
+  version: string
+  /** nombre del archivo (Mitzi-Setup-x.y.z.exe o Mitzi-x.y.z.apk) */
+  name: string
+  url: string
+  /** SHA256SUMS.txt de la misma versión: la huella que debe tener la descarga */
+  sumsUrl: string
+  notes: string
+  pageUrl: string
+}
+
 /** Puente que el preload de Electron expone como `window.mitziNative`. */
 export interface MitziNativeApi {
   getFolders(): Promise<LibraryFolders>
@@ -27,4 +39,6 @@ export interface MitziNativeApi {
   toggleFullscreen(): Promise<boolean>
   onFullscreenChanged(cb: (fullscreen: boolean) => void): () => void
   keepAwake(on: boolean): Promise<void>
+  installUpdate(info: UpdateInfo): Promise<'installing'>
+  onUpdateProgress(cb: (fraction: number) => void): () => void
 }
