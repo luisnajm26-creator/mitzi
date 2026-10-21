@@ -10,6 +10,7 @@ interface MitziLibraryPlugin {
   readFile(options: { path: string }): Promise<{ path: string }>
   setKeepAwake(options: { on: boolean }): Promise<void>
   setHighRefresh(options: { on: boolean }): Promise<void>
+  openUrl(options: { url: string }): Promise<void>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
 }
 
@@ -69,6 +70,7 @@ export function createAndroidPlatform(): Platform {
       }
     },
     importDropped: async () => 0,
+    openExternal: url => void Library.openUrl({ url }).catch(() => {}),
     async toggleFullscreen() {
       await this.setImmersive?.(!immersive)
       return immersive

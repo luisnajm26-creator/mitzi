@@ -254,6 +254,24 @@ public class MitziLibraryPlugin extends Plugin {
         for (int i = CACHE_KEEP; i < files.length; i++) files[i].delete();
     }
 
+    /** Abre un enlace en el navegador o la app de correo del teléfono (solo https y mailto). */
+    @PluginMethod
+    public void openUrl(PluginCall call) {
+        String url = call.getString("url", "");
+        if (!(url.startsWith("https://") || url.startsWith("mailto:"))) {
+            call.reject("Dirección no permitida");
+            return;
+        }
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getActivity().startActivity(intent);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("No hay una app para abrirlo");
+        }
+    }
+
     // ---------- pantalla ----------
 
     @PluginMethod

@@ -25,6 +25,12 @@ const paths = {
   sort: 'M7 4v16M4 17l3 3 3-3M17 20V4M14 7l3-3 3 3',
   layers: 'M12 3l9 5-9 5-9-5zM3 13l9 5 9-5',
   file: 'M6 3h8l4 4v14H6zM14 3v4h4',
+  info: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v6M12 7.5h.01',
+  mail: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  code: 'M8 7l-5 5 5 5M16 7l5 5-5 5',
+  heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
+  bug: 'M8 9h8v6a4 4 0 0 1-8 0zM12 9V6M9 6.5 7.5 5M15 6.5 16.5 5M4 12h4M16 12h4M5 18l3-1.5M19 18l-3-1.5',
+  user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
 } as const
 
 export type IconName = keyof typeof paths

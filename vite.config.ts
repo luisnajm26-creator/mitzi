@@ -67,8 +67,13 @@ function devBooks(): Plugin {
   }
 }
 
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { version: string }
+
 export default defineConfig({
   base: './',
+  define: {
+    __MITZI_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [react(), devBooks()],
   resolve: {
     alias: {

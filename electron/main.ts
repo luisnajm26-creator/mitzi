@@ -58,9 +58,10 @@ function createWindow() {
   win.on('leave-full-screen', () => win?.webContents.send('window:fullscreen-changed', false))
   win.on('closed', () => (win = null))
 
-  // Los enlaces externos de los libros se abren en el navegador, nunca dentro de la app.
+  // Los enlaces externos (de los libros o de «Acerca de») se abren en el navegador o en
+  // la app de correo, nunca dentro de Mitzi.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) shell.openExternal(url)
+    if (/^(https?:\/\/|mailto:)/.test(url)) shell.openExternal(url)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (event, url) => {

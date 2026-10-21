@@ -7,6 +7,7 @@ import { db } from '../library/db'
 import { retryFailed, syncLibrary } from '../library/scanner'
 import { carouselBooks, useLibraryQuery, type CarouselFilter } from '../library/query'
 import { Explorer } from './Explorer'
+import { About } from './About'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
 import { AmbientBackground } from './AmbientBackground'
 import { CLOSE_MS, createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
@@ -33,6 +34,7 @@ export function Shelf({ active }: { active: boolean }) {
   const scanning = useLibrary(s => s.scanning)
   const failed = useLibrary(s => s.failed)
   const [failedOpen, setFailedOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const openBook = useApp(s => s.openBook)
   const motion = useMemo(createMotion, [])
   const [center, setCenter] = useState(0)
@@ -174,6 +176,9 @@ export function Shelf({ active }: { active: boolean }) {
           <button className="icon-button" onClick={() => setFoldersOpen(true)} title="Carpetas de libros">
             <Icon name="folder" />
           </button>
+          <button className="icon-button" onClick={() => setAboutOpen(true)} title="Acerca de Mitzi" aria-label="Acerca de Mitzi">
+            <Icon name="info" />
+          </button>
           {!isTouchDevice && (
             <button className="icon-button" onClick={() => platform.toggleFullscreen()} title="Pantalla completa (F11)">
               <Icon name="fullscreen" />
@@ -233,6 +238,7 @@ export function Shelf({ active }: { active: boolean }) {
         </button>
       )}
       {failedOpen && <FailedPanel onClose={() => setFailedOpen(false)} />}
+      {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
       {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}
       {explorerOpen && <Explorer onClose={() => setExplorerOpen(false)} onPick={pickBook} onShowGroup={showGroup} />}
       <div

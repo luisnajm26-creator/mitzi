@@ -28,6 +28,8 @@ export interface Platform {
   toggleFullscreen(): Promise<boolean>
   onFullscreenChanged(cb: (fullscreen: boolean) => void): () => void
   keepAwake(on: boolean): Promise<void>
+  /** Abre un enlace (https o mailto) fuera de la app: navegador o app de correo. */
+  openExternal(url: string): void
   /** Oculta las barras del sistema (Android) para leer a pantalla completa. */
   setImmersive?(on: boolean): Promise<void>
   /** Pide la frecuencia de pantalla más alta mientras hay animación (Android). */

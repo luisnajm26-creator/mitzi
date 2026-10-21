@@ -22,5 +22,7 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     toggleFullscreen: () => api.toggleFullscreen(),
     onFullscreenChanged: cb => api.onFullscreenChanged(cb),
     keepAwake: on => api.keepAwake(on),
+    // la ventana principal manda los enlaces externos al navegador (ver electron/main.ts)
+    openExternal: url => void window.open(url, '_blank'),
   }
 }

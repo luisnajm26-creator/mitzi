@@ -382,3 +382,126 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ---------- Acerca de Mitzi ---------- */
+.about-app {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 10px;
+}
+
+.about-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+}
+
+.about-name {
+  font-family: var(--title-font);
+  font-weight: 600;
+  font-size: 24px;
+}
+
+.about-version {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+.about-card {
+  margin: 16px 0;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+}
+
+.about-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.about-author {
+  margin-top: 2px;
+  font-family: var(--title-font);
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.about-tagline {
+  margin: 4px 0 0;
+  opacity: 0.8;
+  line-height: 1.45;
+}
+
+.about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-ai {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.7;
+}
+
+.about-credits {
+  margin-top: 18px;
+}
+
+.about-credits summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 6px 0;
+}
+
+.about-credits ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.about-credit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.about-credit > span:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.about-credit small {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.about-credit .badge {
+  flex-shrink: 0;
+}

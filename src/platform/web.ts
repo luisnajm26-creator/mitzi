@@ -45,6 +45,7 @@ export function createWebPlatform(): Platform {
       return () => hot.off('mitzi:library-changed', cb)
     },
     importDropped: async () => 0,
+    openExternal: url => void window.open(url, '_blank', 'noopener'),
     async toggleFullscreen() {
       if (document.fullscreenElement) {
         await document.exitFullscreen()
