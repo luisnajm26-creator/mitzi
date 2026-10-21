@@ -1,8 +1,9 @@
 import Dexie, { type Table } from 'dexie'
 import type { Palette } from './palette'
+import type { BookFormat } from './formats'
 import { guessSeries, seriesKeyOf } from './series'
 
-export type BookFormat = 'epub' | 'pdf'
+export type { BookFormat }
 
 export interface BookRecord {
   /** SHA-256 del archivo: el mismo libro tiene el mismo id en cualquier dispositivo. */

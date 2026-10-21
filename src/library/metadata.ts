@@ -30,8 +30,7 @@ const COVER_HEIGHT = 1024
 /** Bytes de XHTML que suelen equivaler a una página impresa. */
 const BYTES_PER_PAGE = 2300
 
-export const formatOf = (name: string): BookFormat | null =>
-  /\.epub$/i.test(name) ? 'epub' : /\.pdf$/i.test(name) ? 'pdf' : null
+export { formatOf } from './formats'
 
 const stripExt = (name: string) => name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim()
 
@@ -49,19 +48,22 @@ export const formatContributor = (c: Contributor | undefined): string => {
 }
 
 export async function extractBook(file: File, format: BookFormat): Promise<ExtractedBook> {
-  return format === 'epub' ? extractEpub(file) : extractPdf(file)
+  return format === 'pdf' ? extractPdf(file) : extractEpub(file)
 }
 
 async function extractEpub(file: File): Promise<ExtractedBook> {
   const { makeBook } = await import('foliate-js/view.js')
   const book = await makeBook(file)
   const md = book.metadata ?? {}
-  const title = formatLanguageMap(md.title).trim() || stripExt(file.name)
+  const named = formatLanguageMap(md.title).trim()
+  // los cómics no traen título: se usa el nombre del archivo, sin la extensión
+  const title = named && named !== file.name ? named : stripExt(file.name)
   const author = formatContributor(md.author).trim()
   const language = Array.isArray(md.language) ? md.language[0] : md.language
   const bytes = book.sections.reduce((sum, s) => sum + (s.linear !== 'no' ? (s.size ?? 0) : 0), 0)
-  const pages = Math.max(8, Math.min(4000, Math.round(bytes / BYTES_PER_PAGE)))
-  const coverBlob = (await book.getCover?.().catch(() => null)) ?? (await firstPageImage(book).catch(() => null))
+  // libros de páginas fijas (cómics): una página por sección; los demás, por cantidad de texto
+  const pages = book.rendition?.layout === 'pre-paginated' ? book.sections.length : Math.max(8, Math.min(4000, Math.round(bytes / BYTES_PER_PAGE)))
+  const coverBlob = (await declaredCover(book)) ?? (await firstPageImage(book).catch(() => null))
   const cover = coverBlob ? await processCover(coverBlob) : null
   return {
     title,
@@ -72,6 +74,15 @@ async function extractEpub(file: File): Promise<ExtractedBook> {
     coverAspect: cover?.aspect ?? 0.68,
     palette: cover?.palette ?? paletteFromSeed(title + author),
     ...seriesOf(title, md.belongsTo),
+  }
+}
+
+/** La portada que el libro declara (algunos formatos devuelven null en vez de una promesa). */
+async function declaredCover(book: FoliateBook): Promise<Blob | null> {
+  try {
+    return (await book.getCover?.()) ?? null
+  } catch {
+    return null
   }
 }
 
@@ -130,23 +141,24 @@ async function extractPdf(file: File): Promise<ExtractedBook> {
 export async function findEpubCover(file: File) {
   const { makeBook } = await import('foliate-js/view.js')
   const book = await makeBook(file)
-  const blob = (await book.getCover?.().catch(() => null)) ?? (await firstPageImage(book).catch(() => null))
+  const blob = (await declaredCover(book)) ?? (await firstPageImage(book).catch(() => null))
   return blob ? processCover(blob) : null
 }
 
 /** Reduce la portada a un tamaño manejable y extrae su paleta. */
 async function processCover(blob: Blob) {
   try {
-    const img = await loadImage(blob)
-    const scale = Math.min(1, COVER_HEIGHT / img.naturalHeight)
+    const img = await decodeImage(blob)
+    const scale = Math.min(1, COVER_HEIGHT / img.height)
     const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale))
-    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale))
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+    canvas.width = Math.max(1, Math.round(img.width * scale))
+    canvas.height = Math.max(1, Math.round(img.height * scale))
+    canvas.getContext('2d')!.drawImage(img.source, 0, 0, canvas.width, canvas.height)
+    img.close()
     const out = await canvasToBlob(canvas)
     return {
       blob: out ?? blob,
-      aspect: img.naturalWidth / img.naturalHeight,
+      aspect: img.width / img.height,
       palette: paletteFromImage(canvas),
     }
   } catch {
@@ -154,16 +166,38 @@ async function processCover(blob: Blob) {
   }
 }
 
-export async function loadImage(blob: Blob) {
-  const url = URL.createObjectURL(blob)
+/** Una imagen ya decodificada, lista para dibujar en un lienzo. */
+export interface DecodedImage {
+  source: CanvasImageSource
+  width: number
+  height: number
+  close(): void
+}
+
+const IMAGE_TIMEOUT = 15_000
+const limit = <T,>(promise: Promise<T>) =>
+  Promise.race([promise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('La imagen tardó demasiado')), IMAGE_TIMEOUT))])
+
+/**
+ * Decodifica una imagen sin colgarse: primero con createImageBitmap (fuera del hilo
+ * principal); si ese formato no se puede así (p. ej. SVG), con <img>. Nunca espera más
+ * de 15 s: con algunas imágenes `img.decode()` no terminaba y trababa la importación.
+ */
+export async function decodeImage(blob: Blob): Promise<DecodedImage> {
   try {
-    const img = new Image()
-    img.src = url
-    await img.decode()
-    return img
-  } finally {
-    // el <img> decodificado ya no necesita la URL
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const bitmap = await limit(createImageBitmap(blob))
+    return { source: bitmap, width: bitmap.width, height: bitmap.height, close: () => bitmap.close() }
+  } catch {
+    const url = URL.createObjectURL(blob)
+    try {
+      const img = new Image()
+      img.src = url
+      await limit(img.decode())
+      return { source: img, width: img.naturalWidth, height: img.naturalHeight, close() {} }
+    } finally {
+      // el <img> decodificado ya no necesita la URL
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }
   }
 }
 

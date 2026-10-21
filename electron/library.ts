@@ -3,7 +3,8 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import type { BookFile, LibraryFolders } from '../shared/native-api.js'
 
-const BOOK_EXT = /\.(epub|pdf)$/i
+// los formatos que Mitzi abre (ver src/library/formats.ts)
+const BOOK_EXT = /\.(epub|pdf|mobi|azw|azw3|fb2|fbz|cbz)$/i
 const MAX_DEPTH = 8
 
 interface Config {

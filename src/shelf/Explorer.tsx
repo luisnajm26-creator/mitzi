@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { db, type BookRecord } from '../library/db'
-import { filterBooks, groupBooks, statusOf, useLibraryQuery, type CarouselFilter, type GroupBy, type SortBy, type StatusFilter } from '../library/query'
+import { filterBooks, groupBooks, statusOf, useLibraryQuery, type CarouselFilter, type FormatFilter, type GroupBy, type SortBy, type StatusFilter } from '../library/query'
+import { FORMAT_LABELS, type BookFormat } from '../library/formats'
 import { useLibrary } from '../library/store'
 import { handleBack, useBackHandler } from '../app/back'
 import { isDark, mix } from '../lib/color'
@@ -108,11 +109,6 @@ const SORTS: { value: SortBy; label: string }[] = [
   { value: 'agregados', label: 'Agregados recientemente' },
 ]
 
-const FORMATS: { value: 'todos' | 'epub' | 'pdf'; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'epub', label: 'EPUB' },
-  { value: 'pdf', label: 'PDF' },
-]
 
 interface Props {
   onClose(): void
@@ -143,6 +139,14 @@ export function Explorer({ onClose, onPick, onShowGroup }: Props) {
     return () => window.removeEventListener('keydown', onKey, true)
   }, [onClose])
 
+  // solo los formatos que hay en la biblioteca
+  const formats = useMemo(() => {
+    const present = new Set(books.map(b => b.format))
+    return [
+      { value: 'todos' as FormatFilter, label: 'Todos' },
+      ...(Object.keys(FORMAT_LABELS) as BookFormat[]).filter(f => present.has(f)).map(f => ({ value: f as FormatFilter, label: FORMAT_LABELS[f] })),
+    ]
+  }, [books])
   const matches = useMemo(() => filterBooks(books, progress, query), [books, progress, query])
   const groups = useMemo(() => groupBooks(matches, progress, query), [matches, progress, query])
   const counts = useMemo(() => {
@@ -187,7 +191,7 @@ export function Explorer({ onClose, onPick, onShowGroup }: Props) {
         <div className="explorer-pickers">
           <Picker label="Agrupar" icon="layers" value={query.group} options={GROUPS} onChange={group => setQuery({ group })} />
           <Picker label="Ordenar" icon="sort" value={query.sort} options={SORTS} onChange={sort => setQuery({ sort })} />
-          <Picker label="Formato" icon="file" value={query.format} options={FORMATS} onChange={format => setQuery({ format })} />
+          {formats.length > 2 && <Picker label="Formato" icon="file" value={query.format} options={formats} onChange={format => setQuery({ format })} />}
         </div>
       </div>
 

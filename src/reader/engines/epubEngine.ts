@@ -98,7 +98,8 @@ export class EpubEngine implements ReaderEngine {
     for (const [name, value] of Object.entries(attrs)) if (r.getAttribute(name) !== value) r.setAttribute(name, value)
     this.#flipEnabled = s.animatePages && (v.bookMode || s.flow === 'paginated')
     const css = epubCss(s, t)
-    if (css !== this.#lastCss) {
+    // los cómics y libros de páginas fijas no tienen texto que reacomodar
+    if (css !== this.#lastCss && !this.#view?.isFixedLayout) {
       this.#lastCss = css
       r.setStyles(css)
       this.#ghosts.invalidate()
@@ -139,7 +140,7 @@ export class EpubEngine implements ReaderEngine {
   canFlip() {
     const r = this.#view?.renderer
     const doc = r?.getContents()[0]?.doc
-    if (!r || !doc || !this.#flipEnabled || r.getAttribute('flow') === 'scrolled') return false
+    if (!r || !doc || !this.#flipEnabled || this.#view?.isFixedLayout || r.getAttribute('flow') === 'scrolled') return false
     // textos verticales o de derecha a izquierda: sin hoja por ahora
     const body = doc.defaultView?.getComputedStyle(doc.body)
     return !!body && body.direction !== 'rtl' && !body.writingMode.startsWith('vertical')

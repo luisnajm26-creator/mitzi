@@ -142,7 +142,7 @@ const COVER_TRY = 1
 
 /** Libros que se importaron sin portada: se busca otra vez con la búsqueda nueva, sin apuro. */
 async function fillMissingCovers() {
-  const pending = await db.books.filter(b => !b.hasCover && !b.missing && b.format === 'epub' && (b.coverTry ?? 0) < COVER_TRY).toArray()
+  const pending = await db.books.filter(b => !b.hasCover && !b.missing && b.format !== 'pdf' && (b.coverTry ?? 0) < COVER_TRY).toArray()
   let found = false
   for (const book of pending) {
     try {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { isReflowable } from '../library/formats'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
 import { refreshLibrary } from '../library/store'
@@ -70,7 +71,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   // libro abierto de dos páginas en pantallas horizontales (si se lee por páginas)
   const bookGeo = useMemo(
     () =>
-      book && settings.flow === 'paginated' && settings.spread === 'auto' && (book.format === 'epub' || settings.pdfFit === 'page')
+      book && settings.flow === 'paginated' && settings.spread === 'auto' && (isReflowable(book.format) || settings.pdfFit === 'page')
         ? computeBookGeometry(size.w, size.h, pageAspect, book.pages)
         : null,
     [book, settings.flow, settings.spread, settings.pdfFit, size.w, size.h, pageAspect],
@@ -263,7 +264,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         setBook(record)
         const [blob, progress] = await Promise.all([platform.readBlob(record.path), db.progress.get(bookId)])
         if (cancelled || !stageRef.current) return
-        engine = record.format === 'epub' ? new EpubEngine(callbacks) : new PdfEngine(callbacks)
+        engine = record.format === 'pdf' ? new PdfEngine(callbacks) : new EpubEngine(callbacks)
         engineRef.current = engine
         await engine.open(stageRef.current, new File([blob], record.fileName), {
           location: progress?.location,
@@ -371,7 +372,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   // los márgenes de la página quedan fuera del documento del EPUB: ahí también se puede tomar la hoja
   useEffect(() => {
     const stage = stageRef.current
-    if (!stage || book?.format !== 'epub') return
+    if (!stage || !book || book.format === 'pdf') return
     const handle = (type: PointerInfo['type']) => (e: PointerEvent) => {
       const taken = onPointerRef.current({ type, x: e.clientX, y: e.clientY, pointerType: e.pointerType })
       if (type === 'down' && taken) {
@@ -638,7 +639,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           }}
         />
       )}
-      {panel === 'comfort' && book && <ComfortPanel bookId={bookId} format={book.format} onClose={() => setPanel(null)} />}
+      {panel === 'comfort' && book && <ComfortPanel bookId={bookId} format={isReflowable(book.format) ? 'epub' : 'pdf'} onClose={() => setPanel(null)} />}
 
       <div className="reader-dim" style={{ opacity: (1 - settings.brightness) * 0.9 }} aria-hidden />
       <div className="reader-warm" style={{ opacity: settings.warmth * 0.3 }} aria-hidden />

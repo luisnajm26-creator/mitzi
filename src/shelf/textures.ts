@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import { clamp, isDark, mix } from '../lib/color'
 import { db, type BookRecord } from '../library/db'
 import { isTouchDevice } from '../platform'
-import { loadImage } from '../library/metadata'
+import { decodeImage } from '../library/metadata'
 
 export const BOOK_HEIGHT = 2.1
 // en teléfonos el dibujo va a 2× como máximo: texturas más chicas ahorran memoria sin perder nitidez
@@ -302,11 +302,12 @@ export function createBookModel(book: BookRecord, dims: BookDims, anisotropy: nu
       return
     }
     try {
-      const img = await loadImage(cover.blob)
-      if (disposed) return
-      const scale = Math.min(1, MAX_COVER_PX / img.naturalHeight)
-      const [canvas, ctx] = makeCanvas(Math.round(img.naturalWidth * scale), Math.round(img.naturalHeight * scale))
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      const img = await decodeImage(cover.blob)
+      if (disposed) return img.close()
+      const scale = Math.min(1, MAX_COVER_PX / img.height)
+      const [canvas, ctx] = makeCanvas(Math.round(img.width * scale), Math.round(img.height * scale))
+      ctx.drawImage(img.source, 0, 0, canvas.width, canvas.height)
+      img.close()
       coverMat.map = tex(canvas)
     } catch {
       // portada dañada: se queda la generada

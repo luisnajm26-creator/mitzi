@@ -35,7 +35,7 @@ public class MainActivity extends BridgeActivity {
                 String name = displayName(uri);
                 if (name == null || !MitziLibraryPlugin.isBook(name)) {
                     String type = getContentResolver().getType(uri);
-                    name = "libro-" + System.currentTimeMillis() + ("application/pdf".equals(type) ? ".pdf" : ".epub");
+                    name = "libro-" + System.currentTimeMillis() + MitziLibraryPlugin.extensionForType(type);
                 }
                 File target = new File(MitziLibraryPlugin.importedDir(this), name.replaceAll("[\\\\/:*?\"<>|]", "_"));
                 try (InputStream in = getContentResolver().openInputStream(uri); OutputStream out = new FileOutputStream(target)) {

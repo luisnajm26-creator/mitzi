@@ -68,6 +68,8 @@ declare module 'foliate-js/view.js' {
   }
 
   export class View extends HTMLElement {
+    /** cómics y libros de páginas fijas: sin columnas ni estilos de texto */
+    isFixedLayout: boolean
     addAnnotation(annotation: ViewAnnotation, remove?: boolean): Promise<{ index: number; label: string } | undefined>
     deleteAnnotation(annotation: ViewAnnotation): Promise<unknown>
     getCFI(index: number, range: Range): string

@@ -3,7 +3,9 @@ import type { BookRecord, ProgressRecord } from './db'
 import { normalize } from './series'
 
 export type StatusFilter = 'todos' | 'leyendo' | 'sin-empezar' | 'terminados'
-export type FormatFilter = 'todos' | 'epub' | 'pdf'
+import type { BookFormat } from './formats'
+
+export type FormatFilter = 'todos' | BookFormat
 export type GroupBy = 'serie' | 'autor' | 'ninguno'
 export type SortBy = 'recientes' | 'titulo' | 'autor' | 'agregados'
 

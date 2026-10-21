@@ -67,9 +67,36 @@ public class MitziLibraryPlugin extends Plugin {
         return dir;
     }
 
+    /** Los formatos que Mitzi abre (ver src/library/formats.ts). */
+    private static final String[] BOOK_EXTENSIONS = { ".epub", ".pdf", ".mobi", ".azw", ".azw3", ".fb2", ".fbz", ".cbz" };
+
     static boolean isBook(String name) {
         String lower = name.toLowerCase(Locale.ROOT);
-        return lower.endsWith(".epub") || lower.endsWith(".pdf");
+        for (String ext : BOOK_EXTENSIONS) if (lower.endsWith(ext)) return true;
+        return false;
+    }
+
+    /** Extensión del libro según su nombre o ruta (la más larga que coincida: .azw3 antes que .azw). */
+    static String extensionOf(String path) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        String best = ".epub";
+        for (String ext : BOOK_EXTENSIONS) if (lower.endsWith(ext) && ext.length() >= best.length()) best = ext;
+        return best;
+    }
+
+    /** Extensión según el tipo de archivo que informa Android (cuando no hay nombre). */
+    static String extensionForType(String type) {
+        if (type == null) return ".epub";
+        switch (type) {
+            case "application/pdf": return ".pdf";
+            case "application/x-mobipocket-ebook": return ".mobi";
+            case "application/vnd.amazon.ebook": return ".azw3";
+            case "application/x-fictionbook+xml":
+            case "application/x-fictionbook": return ".fb2";
+            case "application/vnd.comicbook+zip":
+            case "application/x-cbz": return ".cbz";
+            default: return ".epub";
+        }
     }
 
     // ---------- carpetas ----------
@@ -232,7 +259,7 @@ public class MitziLibraryPlugin extends Plugin {
                 }
                 File cache = new File(getContext().getCacheDir(), "libros");
                 if (!cache.exists()) cache.mkdirs();
-                String ext = path.toLowerCase(Locale.ROOT).endsWith(".pdf") || path.toLowerCase(Locale.ROOT).contains(".pdf") ? ".pdf" : ".epub";
+                String ext = extensionOf(Uri.decode(path));
                 File out = new File(cache, Integer.toHexString(path.hashCode()) + ext);
                 try (InputStream in = getContext().getContentResolver().openInputStream(uri); OutputStream os = new FileOutputStream(out)) {
                     if (in == null) throw new Exception("No se pudo abrir el archivo");

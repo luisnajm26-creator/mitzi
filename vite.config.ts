@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const testBooksDir = path.join(root, 'libros-prueba')
-const BOOK_EXT = /\.(epub|pdf)$/i
+const BOOK_EXT = /\.(epub|pdf|mobi|azw|azw3|fb2|fbz|cbz)$/i
 
 type DevBook = { path: string; name: string; size: number; mtime: number }
 
