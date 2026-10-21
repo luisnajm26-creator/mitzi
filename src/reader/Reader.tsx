@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { formatMinutes, paceFactor, resetPaceSession, trackPace } from './pace'
 import { isReflowable } from '../library/formats'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
@@ -238,6 +239,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     let engine: ReaderEngine | null = null
     const callbacks: EngineCallbacks = {
       onRelocate(l) {
+        if (l.minutesLeft) trackPace(l.minutesLeft.total)
         setLoc(l)
         pending.current = l
         clearTimeout(saveTimer.current)
@@ -262,6 +264,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         const record = await db.books.get(bookId)
         if (!record) throw new Error('Libro no encontrado')
         setBook(record)
+        resetPaceSession()
         const [blob, progress] = await Promise.all([platform.readBlob(record.path), db.progress.get(bookId)])
         if (cancelled || !stageRef.current) return
         engine = record.format === 'pdf' ? new PdfEngine(callbacks) : new EpubEngine(callbacks)
@@ -460,6 +463,16 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   const fraction = scrub ?? loc?.fraction ?? 0
   const percent = Math.round(fraction * 100)
+  // «8 min de capítulo · 3 h del libro», al ritmo de quien lee
+  const timeLeft = useMemo(() => {
+    const left = loc?.minutesLeft
+    if (!left || scrub !== null) return null
+    const f = paceFactor()
+    const parts = []
+    if (left.section !== undefined && left.section > 0.2) parts.push(`${formatMinutes(left.section / f)} de capítulo`)
+    parts.push(`${formatMinutes(left.total / f)} del libro`)
+    return parts.join(' · ')
+  }, [loc, scrub])
   const commitScrub = (e: { currentTarget: HTMLInputElement; type: string }) => {
     // al soltar, la barra suelta el foco: así las flechas vuelven a pasar página
     if (e.type === 'pointerup') e.currentTarget.blur()
@@ -560,6 +573,7 @@ export default function Reader({ bookId }: { bookId: string }) {
           onPointerUp={commitScrub}
           onKeyUp={commitScrub}
         />
+        {timeLeft && <span className="reader-time">{timeLeft}</span>}
         <span className="reader-percent">{percent}%</span>
       </footer>
       <div className="reader-mini-progress" aria-hidden />

@@ -11,6 +11,8 @@ type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
  * PDF con pdf.js. Dibuja una página (o dos en pantallas anchas, con la portada sola)
  * y solo vuelve a dibujar al cambiar de página o de tamaño: en reposo no gasta nada.
  */
+const PDF_MINUTES_PER_PAGE = 1.5
+
 export class PdfEngine implements ReaderEngine {
   readonly format = 'pdf' as const
   #cb: EngineCallbacks
@@ -341,10 +343,16 @@ export class PdfEngine implements ReaderEngine {
     const first = visible[0] + 1
     const last = visible[visible.length - 1] + 1
     const chapter = [...this.#toc].reverse().find(t => t.page <= first)?.label
+    const nextChapter = this.#toc.find(t => t.page > last)?.page
     this.#cb.onRelocate({
       fraction: n <= 1 ? 1 : (last - 1) / (n - 1),
       location: String(first),
       chapter,
+      // ritmo estándar de PDF: un minuto y medio por página
+      minutesLeft: {
+        total: (n - last) * PDF_MINUTES_PER_PAGE,
+        section: nextChapter ? (nextChapter - 1 - last) * PDF_MINUTES_PER_PAGE : undefined,
+      },
       pageLabel: visible.length > 1 ? `Páginas ${first}–${last} de ${n}` : `Página ${first} de ${n}`,
     })
   }

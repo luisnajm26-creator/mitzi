@@ -16,6 +16,8 @@ export interface ReaderLocation {
   location: string
   chapter?: string
   pageLabel?: string
+  /** minutos que faltan al ritmo estándar (se ajustan al ritmo de quien lee en pace.ts) */
+  minutesLeft?: { section?: number; total: number }
 }
 
 /** Texto seleccionado, listo para subrayar. */

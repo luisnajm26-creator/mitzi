@@ -232,6 +232,8 @@ export class EpubEngine implements ReaderEngine {
       location: d.cfi,
       chapter: d.tocItem?.label?.trim(),
       pageLabel: d.pageItem?.label,
+      // en los cómics el «tiempo» de foliate saldría del peso de las imágenes: no sirve
+      minutesLeft: d.time && !this.#view?.isFixedLayout ? { section: d.time.section, total: d.time.total } : undefined,
     })
   }
 

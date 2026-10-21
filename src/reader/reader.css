@@ -379,6 +379,26 @@
   text-align: right;
 }
 
+/* tiempo que falta, al ritmo de quien lee */
+.reader-time {
+  font-size: 12.5px;
+  color: var(--r-muted);
+  white-space: nowrap;
+}
+
+/* en el teléfono va en su propia línea, debajo de la barra de avance */
+@media (max-width: 600px) {
+  .reader-bar.bottom {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+  .reader-time {
+    order: 5;
+    width: 100%;
+    text-align: center;
+  }
+}
+
 .reader-progress {
   flex: 1;
   appearance: none;

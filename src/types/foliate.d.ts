@@ -42,6 +42,8 @@ declare module 'foliate-js/view.js' {
     location?: { current: number; next: number; total: number }
     tocItem?: TocItem | null
     pageItem?: TocItem | null
+    /** minutos que faltan (sección y libro) a 1600 caracteres por minuto */
+    time?: { section: number; total: number }
     cfi: string
     range?: Range
   }
