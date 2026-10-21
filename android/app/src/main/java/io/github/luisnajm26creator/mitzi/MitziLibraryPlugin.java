@@ -304,6 +304,30 @@ public class MitziLibraryPlugin extends Plugin {
         }
     }
 
+    /**
+     * Ofrece el texto seleccionado a las apps que saben procesarlo (traductores,
+     * diccionarios). Si no hay ninguna, avisa para que Mitzi abra la web.
+     */
+    @PluginMethod
+    public void processText(PluginCall call) {
+        String text = call.getString("text", "");
+        Intent intent = new Intent(Intent.ACTION_PROCESS_TEXT);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_PROCESS_TEXT, text);
+        intent.putExtra(Intent.EXTRA_PROCESS_TEXT_READONLY, true);
+        JSObject ret = new JSObject();
+        if (getContext().getPackageManager().queryIntentActivities(intent, 0).isEmpty()) {
+            ret.put("handled", false);
+            call.resolve(ret);
+            return;
+        }
+        Intent chooser = Intent.createChooser(intent, "Abrir con");
+        chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getActivity().startActivity(chooser);
+        ret.put("handled", true);
+        call.resolve(ret);
+    }
+
     // ---------- actualizaciones ----------
 
     /** Solo se descargan archivos de las versiones publicadas de este repositorio. */

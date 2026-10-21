@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { lookup } from '../lookup'
 import type { AnnotationRecord, BookmarkRecord, HighlightColor } from '../../library/db'
 import { isTouchDevice, platform } from '../../platform'
 import { Icon } from '../../ui/Icon'
@@ -60,6 +61,15 @@ export function SelectionMenu({ rect, text, theme, onHighlight, onNote }: Select
       </button>
       <button className="float-action" onClick={() => navigator.clipboard?.writeText(text)} title="Copiar">
         <Icon name="copy" size={19} />
+      </button>
+      {/* una o dos palabras: buscar en el diccionario */}
+      {text.trim().split(/\s+/).length <= 2 && (
+        <button className="float-action" onClick={() => lookup(text, 'define')} title="Definir">
+          <Icon name="book" size={19} />
+        </button>
+      )}
+      <button className="float-action" onClick={() => lookup(text, 'translate')} title="Traducir">
+        <Icon name="translate" size={19} />
       </button>
     </div>
   )

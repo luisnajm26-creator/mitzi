@@ -30,6 +30,8 @@ export interface Platform {
   keepAwake(on: boolean): Promise<void>
   /** Abre un enlace (https o mailto) fuera de la app: navegador o app de correo. */
   openExternal(url: string): void
+  /** Ofrece el texto a las apps que saben procesarlo (Android). false si no hay ninguna. */
+  lookupText?(text: string): Promise<boolean>
   /**
    * Descarga una versión nueva, comprueba su huella y la instala (PC y Android).
    * 'needs-permission': Android pidió permitir que Mitzi instale apps.

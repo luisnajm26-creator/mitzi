@@ -11,6 +11,7 @@ interface MitziLibraryPlugin {
   setKeepAwake(options: { on: boolean }): Promise<void>
   setHighRefresh(options: { on: boolean }): Promise<void>
   openUrl(options: { url: string }): Promise<void>
+  processText(options: { text: string }): Promise<{ handled: boolean }>
   installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
   addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
@@ -73,6 +74,10 @@ export function createAndroidPlatform(): Platform {
     },
     importDropped: async () => 0,
     openExternal: url => void Library.openUrl({ url }).catch(() => {}),
+    lookupText: text =>
+      Library.processText({ text })
+        .then(r => r.handled)
+        .catch(() => false),
     async installUpdate(info, onProgress) {
       const handle = await Library.addListener('updateProgress', e => onProgress(e.fraction))
       try {

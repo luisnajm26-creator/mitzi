@@ -32,6 +32,7 @@ const paths = {
   bug: 'M8 9h8v6a4 4 0 0 1-8 0zM12 9V6M9 6.5 7.5 5M15 6.5 16.5 5M4 12h4M16 12h4M5 18l3-1.5M19 18l-3-1.5',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
   notes: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5',
+  translate: 'M4 5h8M8 3v2M6 5c0 4 3 7 6 8M10 5c-1 4-4 7-7 8M13 21l4-9 4 9M14.5 18h5',
 } as const
 
 export type IconName = keyof typeof paths
