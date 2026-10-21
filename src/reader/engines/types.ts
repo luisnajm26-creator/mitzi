@@ -20,6 +20,14 @@ export interface ReaderLocation {
   minutesLeft?: { section?: number; total: number }
 }
 
+/** Un resultado de búsqueda dentro del libro. */
+export interface SearchResult {
+  /** CFI (EPUB) o número de página (PDF), para ir ahí */
+  location: string
+  excerpt: { pre: string; match: string; post: string }
+  chapter?: string
+}
+
 /** Texto seleccionado, listo para subrayar. */
 export interface TextSelection {
   text: string
@@ -112,6 +120,13 @@ export interface ReaderEngine {
   /** Dibuja los subrayados del libro (se llama de nuevo cuando cambian). */
   setAnnotations(list: AnnotationRecord[], theme: ThemeColors): void
   clearSelection(): void
+  /** Dónde empieza lo que se ve ahora (para un marcador) y un fragmento de su texto. */
+  bookmarkHere(): { location: string; excerpt: string } | null
+  /** ¿Esa posición guardada está en lo que se ve ahora? */
+  showing(location: string): boolean
+  /** Busca en todo el libro y entrega los resultados a medida que los encuentra. */
+  search(query: string, onResults: (results: SearchResult[]) => void, onProgress: (fraction: number) => void, signal: AbortSignal): Promise<void>
+  clearSearch(): void
   /** Empieza a leer en voz alta desde la página visible. */
   speech(lang?: string): Promise<SpeechSource | null>
   destroy(): void

@@ -98,9 +98,26 @@ declare module 'foliate-js/view.js' {
     goRight(): Promise<void>
     getSectionFractions(): number[]
     deselect(): void
+    search(opts: {
+      query: string
+      matchCase?: boolean
+      matchDiacritics?: boolean
+      matchWholeWords?: boolean
+      draw?: unknown
+      drawOptions?: Record<string, unknown>
+    }): AsyncGenerator<
+      'done' | { progress: number } | { label: string; subitems: { cfi: string; excerpt: { pre: string; match: string; post: string } }[] }
+    >
+    clearSearch(): void
   }
 
   export function makeBook(file: File | Blob | string): Promise<FoliateBook>
+}
+
+declare module 'foliate-js/epubcfi.js' {
+  /** extremo inicial (o final) de una CFI de rango */
+  export function collapse(cfi: string, toEnd?: boolean): string
+  export function compare(a: string, b: string): number
 }
 
 declare module 'foliate-js/overlayer.js' {

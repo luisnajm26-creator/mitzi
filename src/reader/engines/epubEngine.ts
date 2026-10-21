@@ -1,3 +1,4 @@
+import { collapse, compare } from 'foliate-js/epubcfi.js'
 import { Overlayer } from 'foliate-js/overlayer.js'
 import type { RelocateDetail, TocItem, View, ViewAnnotation } from 'foliate-js/view.js'
 import type { AnnotationRecord } from '../../library/db'
@@ -7,7 +8,7 @@ import type { ComfortSettings } from '../comfort/settings'
 import { GhostPages } from '../pageTurn/epubGhost'
 import { createEpubSpeech } from '../tts/epubSpeech'
 import { setupPlate } from './plates'
-import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, TocEntry, ViewOptions } from './types'
+import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, SearchResult, TocEntry, ViewOptions } from './types'
 
 const idle = () => new Promise<void>(resolve => (window.requestIdleCallback ?? setTimeout)(() => resolve()))
 
@@ -188,6 +189,43 @@ export class EpubEngine implements ReaderEngine {
     })()
       .catch(() => {})
       .finally(() => (this.#prewarming = false))
+  }
+
+  bookmarkHere() {
+    const loc = this.#view?.lastLocation
+    if (!loc?.cfi) return null
+    const excerpt = loc.range?.toString().replace(/\s+/g, ' ').trim().slice(0, 160) ?? ''
+    return { location: collapse(loc.cfi), excerpt }
+  }
+
+  showing(location: string) {
+    const cfi = this.#view?.lastLocation?.cfi
+    if (!cfi || !location.startsWith('epubcfi(')) return false
+    try {
+      return compare(location, collapse(cfi)) >= 0 && compare(location, collapse(cfi, true)) <= 0
+    } catch {
+      return false
+    }
+  }
+
+  async search(query: string, onResults: (r: SearchResult[]) => void, onProgress: (f: number) => void, signal: AbortSignal) {
+    const view = this.#view
+    if (!view) return
+    // sin distinguir mayúsculas ni tildes; lo encontrado se resalta en el libro
+    const iter = view.search({
+      query,
+      draw: Overlayer.highlight,
+      drawOptions: { color: this.#theme?.highlights.amarillo ?? 'rgba(255, 220, 90, 0.5)' },
+    })
+    for await (const r of iter) {
+      if (signal.aborted || r === 'done') break
+      if ('progress' in r) onProgress(r.progress)
+      else onResults(r.subitems.map(s => ({ location: s.cfi, excerpt: s.excerpt, chapter: r.label || undefined })))
+    }
+  }
+
+  clearSearch() {
+    this.#view?.clearSearch()
   }
 
   speech(lang?: string) {

@@ -57,6 +57,20 @@ export interface ProgressRecord {
 
 export type HighlightColor = 'amarillo' | 'verde' | 'azul' | 'rosa' | 'lila'
 
+/** Marcador de página: para volver a una página sin subrayar nada. */
+export interface BookmarkRecord {
+  id: string
+  bookId: string
+  /** CFI (EPUB) o número de página (PDF) donde empieza la página marcada */
+  location: string
+  fraction: number
+  /** capítulo o «Página N» */
+  label?: string
+  /** el comienzo del texto de esa página, para reconocerla en la lista */
+  excerpt?: string
+  createdAt: number
+}
+
 /** Subrayado (y nota opcional) dentro de un libro. */
 export interface AnnotationRecord {
   id: string
@@ -88,6 +102,7 @@ class MitziDB extends Dexie {
   progress!: Table<ProgressRecord, string>
   annotations!: Table<AnnotationRecord, string>
   covers!: Table<CoverRecord, string>
+  bookmarks!: Table<BookmarkRecord, string>
 
   constructor() {
     super('mitzi')
@@ -122,6 +137,10 @@ class MitziDB extends Dexie {
           })
         }
       })
+    // marcadores de página
+    this.version(4).stores({
+      bookmarks: 'id, bookId',
+    })
   }
 }
 

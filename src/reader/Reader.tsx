@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { formatMinutes, paceFactor, resetPaceSession, trackPace } from './pace'
+import { SearchPanel } from './SearchPanel'
 import { isReflowable } from '../library/formats'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
@@ -16,11 +17,11 @@ import { PageFlip, type FlipContext } from './pageTurn/PageFlip'
 import { TocPanel } from './TocPanel'
 import { ReadAloudBar, useReadAloud } from './tts/ReadAloud'
 import { AnnotationPopover, NoteEditor, NotesPanel, SelectionMenu } from './annotations/Annotations'
-import type { AnnotationRecord, HighlightColor } from '../library/db'
+import type { AnnotationRecord, BookmarkRecord, HighlightColor } from '../library/db'
 import type { PointerInfo, TextSelection } from './engines/types'
 import './reader.css'
 
-type Panel = null | 'toc' | 'comfort' | 'notes'
+type Panel = null | 'toc' | 'comfort' | 'notes' | 'search'
 
 export default function Reader({ bookId }: { bookId: string }) {
   const closeBook = useApp(s => s.closeBook)
@@ -49,6 +50,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [chrome, setChrome] = useState(true)
   const [panel, setPanel] = useState<Panel>(null)
   const [annotations, setAnnotations] = useState<AnnotationRecord[]>([])
+  const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([])
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [tapped, setTapped] = useState<{ id: string; rect: DOMRect } | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -214,6 +216,7 @@ export default function Reader({ bookId }: { bookId: string }) {
     key(e) {
       if (['ArrowRight', 'PageDown'].includes(e.key) || (e.key === ' ' && !e.shiftKey)) turn(1)
       else if (['ArrowLeft', 'PageUp'].includes(e.key) || (e.key === ' ' && e.shiftKey)) turn(-1)
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') setPanel('search')
       else if (e.key === 'Escape') {
         if (tappedRef.current) setTapped(null)
         else if (latest.current.panel) setPanel(null)
@@ -278,9 +281,13 @@ export default function Reader({ bookId }: { bookId: string }) {
         if (cancelled) return
         setPageAspect(engine.pageAspect())
         setToc(engine.toc())
-        const saved = await db.annotations.where('bookId').equals(bookId).toArray()
+        const [saved, marks] = await Promise.all([
+          db.annotations.where('bookId').equals(bookId).toArray(),
+          db.bookmarks.where('bookId').equals(bookId).toArray(),
+        ])
         if (cancelled) return
         setAnnotations(saved.filter(a => !a.deleted))
+        setBookmarks(marks.sort((a, b) => a.fraction - b.fraction))
         setStatus('ready')
         hideTimer.current = setTimeout(() => setChrome(false), 2200)
       } catch (e) {
@@ -461,6 +468,32 @@ export default function Reader({ bookId }: { bookId: string }) {
     }
   }, [])
 
+  // marcador de la página que se ve (si hay)
+  const currentBookmark = useMemo(
+    () => (loc && status === 'ready' ? bookmarks.find(b => engineRef.current?.showing(b.location)) : undefined),
+    [bookmarks, loc, status],
+  )
+  const toggleBookmark = () => {
+    if (currentBookmark) {
+      db.bookmarks.delete(currentBookmark.id)
+      setBookmarks(list => list.filter(b => b.id !== currentBookmark.id))
+      return
+    }
+    const here = engineRef.current?.bookmarkHere()
+    if (!here || !loc) return
+    const record: BookmarkRecord = {
+      id: crypto.randomUUID(),
+      bookId,
+      location: here.location,
+      fraction: loc.fraction,
+      label: loc.chapter ?? loc.pageLabel,
+      excerpt: here.excerpt,
+      createdAt: Date.now(),
+    }
+    db.bookmarks.put(record)
+    setBookmarks(list => [...list, record].sort((a, b) => a.fraction - b.fraction))
+  }
+
   const fraction = scrub ?? loc?.fraction ?? 0
   const percent = Math.round(fraction * 100)
   // «8 min de capítulo · 3 h del libro», al ritmo de quien lee
@@ -543,8 +576,20 @@ export default function Reader({ bookId }: { bookId: string }) {
               <Icon name="speaker" />
             </button>
           )}
-          <button className="reader-icon" onClick={() => setPanel(p => (p === 'notes' ? null : 'notes'))} aria-label="Subrayados y notas" title="Subrayados y notas">
-            <Icon name="bookmark" />
+          <button
+            className="reader-icon"
+            data-on={!!currentBookmark}
+            onClick={toggleBookmark}
+            aria-label={currentBookmark ? 'Quitar marcador' : 'Marcar esta página'}
+            title={currentBookmark ? 'Quitar marcador' : 'Marcar esta página'}
+          >
+            <Icon name="bookmark" filled={!!currentBookmark} />
+          </button>
+          <button className="reader-icon" onClick={() => setPanel(p => (p === 'search' ? null : 'search'))} aria-label="Buscar en el libro" title="Buscar en el libro (Ctrl+F)">
+            <Icon name="search" />
+          </button>
+          <button className="reader-icon" onClick={() => setPanel(p => (p === 'notes' ? null : 'notes'))} aria-label="Marcadores, subrayados y notas" title="Marcadores, subrayados y notas">
+            <Icon name="notes" />
           </button>
           <button className="reader-icon" onClick={() => setPanel(p => (p === 'toc' ? null : 'toc'))} aria-label="Índice" title="Índice">
             <Icon name="toc" />
@@ -632,14 +677,34 @@ export default function Reader({ bookId }: { bookId: string }) {
           title={book.title}
           author={book.author}
           annotations={sortedAnnotations}
+          bookmarks={bookmarks}
           theme={theme}
           onClose={() => setPanel(null)}
+          onGoBookmark={b => {
+            engineRef.current?.goTo(b.location)
+            setPanel(null)
+          }}
+          onDeleteBookmark={b => {
+            db.bookmarks.delete(b.id)
+            setBookmarks(list => list.filter(x => x.id !== b.id))
+          }}
           onGo={a => {
             engineRef.current?.goTo(a.anchor)
             setPanel(null)
           }}
           onEdit={a => setEditing(a.id)}
           onDelete={a => updateAnnotation(a.id, { deleted: true })}
+        />
+      )}
+      {panel === 'search' && (
+        <SearchPanel
+          engine={engineRef.current}
+          onClose={() => setPanel(null)}
+          onGo={r => {
+            engineRef.current?.goTo(r.location)
+            // en el teléfono el panel tapa el libro: se cierra para ver el resultado
+            if (isTouchDevice) setPanel(null)
+          }}
         />
       )}
       {panel === 'toc' && (

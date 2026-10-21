@@ -31,17 +31,18 @@ const paths = {
   heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
   bug: 'M8 9h8v6a4 4 0 0 1-8 0zM12 9V6M9 6.5 7.5 5M15 6.5 16.5 5M4 12h4M16 12h4M5 18l3-1.5M19 18l-3-1.5',
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
+  notes: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5',
 } as const
 
 export type IconName = keyof typeof paths
 
-export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
+export function Icon({ name, size = 22, filled = false }: { name: IconName; size?: number; filled?: boolean }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? 'currentColor' : 'none'}
       stroke="currentColor"
       strokeWidth={1.8}
       strokeLinecap="round"

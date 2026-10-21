@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import type { AnnotationRecord, HighlightColor } from '../../library/db'
+import type { AnnotationRecord, BookmarkRecord, HighlightColor } from '../../library/db'
 import { isTouchDevice, platform } from '../../platform'
 import { Icon } from '../../ui/Icon'
 import type { ThemeColors } from '../comfort/contrast'
@@ -152,14 +152,17 @@ interface NotesPanelProps {
   title: string
   author: string
   annotations: AnnotationRecord[]
+  bookmarks: BookmarkRecord[]
   theme: ThemeColors
   onGo(a: AnnotationRecord): void
   onEdit(a: AnnotationRecord): void
   onDelete(a: AnnotationRecord): void
+  onGoBookmark(b: BookmarkRecord): void
+  onDeleteBookmark(b: BookmarkRecord): void
   onClose(): void
 }
 
-export function NotesPanel({ title, author, annotations, theme, onGo, onEdit, onDelete, onClose }: NotesPanelProps) {
+export function NotesPanel({ title, author, annotations, bookmarks, theme, onGo, onEdit, onDelete, onGoBookmark, onDeleteBookmark, onClose }: NotesPanelProps) {
   const [copied, setCopied] = useState(false)
   const markdown = () => annotationsToMarkdown(title, author, annotations)
   const copy = async () => {
@@ -176,15 +179,41 @@ export function NotesPanel({ title, author, annotations, theme, onGo, onEdit, on
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
   return (
-    <aside className="reader-panel notes-panel" role="dialog" aria-label="Subrayados y notas">
+    <aside className="reader-panel notes-panel" role="dialog" aria-label="Marcadores, subrayados y notas">
       <header className="panel-header">
-        <h2>Subrayados y notas</h2>
+        <h2>Marcadores y notas</h2>
         <button className="panel-close" onClick={onClose} aria-label="Cerrar">
           <Icon name="close" />
         </button>
       </header>
+      {bookmarks.length > 0 && (
+        <>
+          <h3 className="notes-section">Marcadores</h3>
+          <ol className="notes-list">
+            {bookmarks.map(b => (
+              <li key={b.id} className="bookmark-item">
+                <button className="note-go" onClick={() => onGoBookmark(b)}>
+                  <span className="note-chapter">
+                    {b.label ?? 'Marcador'} · {Math.round(b.fraction * 100)}%
+                  </span>
+                  {b.excerpt && <span className="note-text">{b.excerpt}</span>}
+                </button>
+                <div className="note-tools">
+                  <button onClick={() => onDeleteBookmark(b)} title="Quitar marcador" aria-label="Quitar marcador">
+                    <Icon name="trash" size={18} />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <h3 className="notes-section">Subrayados y notas</h3>
+        </>
+      )}
       {annotations.length === 0 ? (
-        <p className="panel-hint">Selecciona un texto y elige un color para subrayarlo. Tus subrayados y notas aparecerán aquí.</p>
+        <p className="panel-hint">
+          Selecciona un texto y elige un color para subrayarlo. Tus subrayados y notas aparecerán aquí. Para marcar una página, toca el marcador de
+          la barra de arriba.
+        </p>
       ) : (
         <>
           <div className="notes-export">

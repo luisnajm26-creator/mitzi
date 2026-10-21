@@ -3,7 +3,7 @@ import type { AnnotationRecord } from '../../library/db'
 import type { ThemeColors } from '../comfort/contrast'
 import type { ComfortSettings } from '../comfort/settings'
 import { loadPdfjs, pdfAssetOptions } from './pdfjs'
-import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, SpeechSource, TocEntry, ViewOptions } from './types'
+import type { EngineCallbacks, OpenOptions, PageSide, PointerInfo, ReaderEngine, SearchResult, SpeechSource, TocEntry, ViewOptions } from './types'
 
 type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
 
@@ -172,6 +172,44 @@ export class PdfEngine implements ReaderEngine {
 
 
   /** Lee las páginas visibles oración por oración y pasa de página al terminar. */
+  bookmarkHere() {
+    if (!this.#doc) return null
+    const page = this.#visible()[0] + 1
+    return { location: String(page), excerpt: `Página ${page}` }
+  }
+
+  showing(location: string) {
+    const page = parseInt(location, 10)
+    return Number.isFinite(page) && this.#visible().includes(page - 1)
+  }
+
+  /** Busca página por página en el texto del PDF (sin distinguir mayúsculas ni tildes). */
+  async search(query: string, onResults: (r: SearchResult[]) => void, onProgress: (f: number) => void, signal: AbortSignal) {
+    const fold = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+    const needle = fold(query.trim())
+    if (!needle || !this.#doc) return
+    for (let n = 1; n <= this.#count; n++) {
+      if (signal.aborted) return
+      const content = await (await this.#page(n)).getTextContent()
+      const text = content.items.map(it => ('str' in it ? it.str + (it.hasEOL ? ' ' : '') : '')).join('').replace(/\s+/g, ' ')
+      // el texto plegado mide lo mismo que el original: los índices sirven para los dos
+      const folded = [...text].map(fold).join('')
+      const found: SearchResult[] = []
+      const chapter = [...this.#toc].reverse().find(t => t.page <= n)?.label
+      for (let i = folded.indexOf(needle); i >= 0 && found.length < 50; i = folded.indexOf(needle, i + needle.length)) {
+        found.push({
+          location: String(n),
+          excerpt: { pre: text.slice(Math.max(0, i - 50), i), match: text.slice(i, i + needle.length), post: text.slice(i + needle.length, i + needle.length + 50) },
+          chapter: chapter ?? `Página ${n}`,
+        })
+      }
+      if (found.length) onResults(found)
+      onProgress(n / this.#count)
+    }
+  }
+
+  clearSearch() {}
+
   async speech(lang?: string): Promise<SpeechSource | null> {
     if (!this.#doc) return null
     let segmenter: Intl.Segmenter
