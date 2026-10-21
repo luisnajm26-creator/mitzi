@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Lector de EPUB y PDF de código abierto, con biblioteca 3D estilo selector de videojuegos.",
   "license": "MIT",
+  "author": "Luis Angel Lopez",
   "private": true,
   "type": "module",
   "main": "dist-electron/electron/main.js",
@@ -15,7 +16,10 @@
     "typecheck": "tsc -b && tsc -p electron/tsconfig.json --noEmit",
     "electron": "electron .",
     "demo": "node scripts/generar-libros-demo.mjs",
-    "android": "node scripts/android.mjs"
+    "android": "node scripts/android.mjs",
+    "llave": "node scripts/crear-llave.mjs",
+    "instalador": "npm run build && electron-builder --win --publish never",
+    "publicar": "node scripts/publicar.mjs"
   },
   "dependencies": {
     "@capacitor-community/text-to-speech": "^8.0.2",
@@ -44,7 +48,46 @@
     "@types/three": "^0.186.0",
     "@vitejs/plugin-react": "^6.1.2",
     "electron": "^44.8.0",
+    "electron-builder": "^26.15.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
+  },
+  "build": {
+    "appId": "io.github.luisnajm26creator.mitzi",
+    "productName": "Mitzi",
+    "copyright": "© Luis Angel Lopez · Licencia MIT",
+    "directories": {
+      "output": "release",
+      "buildResources": "resources"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json",
+      "!node_modules/**/*"
+    ],
+    "asar": true,
+    "electronDist": "node_modules/electron/dist",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Mitzi",
+      "artifactName": "Mitzi-Setup-${version}.exe",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": null
   }
 }

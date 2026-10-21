@@ -1,4 +1,16 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+// Una sola versión para todo: la de package.json (versionCode = mayor·10000 + menor·100 + parche)
+def mitziVersion = new JsonSlurper().parse(file('../../package.json')).version
+def (vMajor, vMinor, vPatch) = mitziVersion.tokenize('.-')[0..2].collect { it as int }
+
+// Llave de firma de las versiones publicadas: vive fuera del repositorio (npm run llave)
+def keyProps = new Properties()
+def keyPropsFile = new File(System.getenv('MITZI_KEYSTORE_PROPERTIES') ?: "${System.getProperty('user.home')}/.mitzi/keystore.properties")
+def hasReleaseKey = keyPropsFile.exists()
+if (hasReleaseKey) keyPropsFile.withInputStream { keyProps.load(it) }
 
 android {
     namespace = "io.github.luisnajm26creator.mitzi"
@@ -7,8 +19,8 @@ android {
         applicationId "io.github.luisnajm26creator.mitzi"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode vMajor * 10000 + vMinor * 100 + vPatch
+        versionName mitziVersion
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +28,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                storeFile file(keyProps['storeFile'])
+                storePassword keyProps['storePassword']
+                keyAlias keyProps['keyAlias']
+                keyPassword keyProps['keyPassword']
+            }
+        }
+    }
     buildTypes {
+        // con la llave creada, también el APK de prueba va firmado con ella: así se puede
+        // pasar de uno a otro sin desinstalar (y sin perder lo leído)
+        debug {
+            if (hasReleaseKey) signingConfig signingConfigs.release
+        }
         release {
+            if (hasReleaseKey) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
