@@ -5,6 +5,7 @@ import { FONT_IDS, FONTS } from './comfort/fonts'
 import { effectiveSettings, useReaderSettings, type ComfortSettings } from './comfort/settings'
 import { CUSTOM_THEME_ID, THEMES, type ThemePreset } from './comfort/themes'
 import { Section, Segment, Slider, Stepper, Toggle } from './controls'
+import { VoiceServerSection } from './tts/VoiceServer'
 
 const GROUPS: { id: ThemePreset['group']; label: string }[] = [
   { id: 'claros', label: 'Claros' },
@@ -173,6 +174,9 @@ export function ComfortPanel({ bookId, format, onClose }: Props) {
         )}
         <Toggle label="Mantener la pantalla encendida" checked={s.keepAwake} onChange={v => set({ keepAwake: v })} />
       </Section>
+
+      {/* en Android la WebView no deja hablar con un servidor sin https: solo en la PC */}
+      {platform.kind !== 'android' && <VoiceServerSection />}
 
       <Section title="Aplicar a">
         <Toggle

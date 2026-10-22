@@ -168,7 +168,7 @@ export function ReadAloudBar(p: BarProps) {
           <option value="">Voz automática</option>
           {voices.map(v => (
             <option key={v.id} value={v.id}>
-              {v.name} ({v.lang})
+              {v.lang ? `${v.name} (${v.lang})` : v.name}
             </option>
           ))}
         </select>

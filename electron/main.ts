@@ -17,7 +17,8 @@ const CSP = [
   "img-src 'self' blob: data:",
   "font-src 'self' blob: data:",
   "media-src 'self' blob: data:",
-  "connect-src 'self' blob: data: https://api.github.com https://*.supabase.co wss://*.supabase.co",
+  // localhost: servidor de voz en la misma PC (voces naturales)
+  "connect-src 'self' blob: data: https://api.github.com http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co",
   "worker-src 'self' blob:",
   "frame-src 'self' blob:",
 ].join('; ')
