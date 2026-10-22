@@ -57,6 +57,16 @@ export interface ProgressRecord {
 
 export type HighlightColor = 'amarillo' | 'verde' | 'azul' | 'rosa' | 'lila'
 
+/** Lo leído en un día (estadísticas y meta diaria). */
+export interface ReadingDay {
+  /** 2026-10-21 */
+  day: string
+  minutes: number
+  pages: number
+  /** ids de los libros que se leyeron ese día */
+  books: string[]
+}
+
 /** Marcador de página: para volver a una página sin subrayar nada. */
 export interface BookmarkRecord {
   id: string
@@ -103,6 +113,7 @@ class MitziDB extends Dexie {
   annotations!: Table<AnnotationRecord, string>
   covers!: Table<CoverRecord, string>
   bookmarks!: Table<BookmarkRecord, string>
+  readingDays!: Table<ReadingDay, string>
 
   constructor() {
     super('mitzi')
@@ -140,6 +151,10 @@ class MitziDB extends Dexie {
     // marcadores de página
     this.version(4).stores({
       bookmarks: 'id, bookId',
+    })
+    // estadísticas: un registro por día
+    this.version(5).stores({
+      readingDays: 'day',
     })
   }
 }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { formatMinutes, paceFactor, resetPaceSession, trackPace } from './pace'
 import { SearchPanel } from './SearchPanel'
 import { playPaperSound } from './paperSound'
+import { dayKey, flushStats, notePageTurn, startReadingSession, todayMinutes } from '../library/stats'
 import { isReflowable } from '../library/formats'
 import { useApp } from '../app/store'
 import { db, type BookRecord } from '../library/db'
@@ -52,6 +53,27 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [panel, setPanel] = useState<Panel>(null)
   const [annotations, setAnnotations] = useState<AnnotationRecord[]>([])
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([])
+  const lastLocation = useRef<string | null>(null)
+  const [goalDone, setGoalDone] = useState<number | null>(null)
+  /** ¿se cumplió la meta del día? Se celebra una sola vez por día. */
+  const checkGoal = async () => {
+    const goal = useReaderSettings.getState().global.dailyGoal
+    if (!goal) return
+    const key = `mitzi-meta-${dayKey()}`
+    try {
+      if (localStorage.getItem(key)) return
+    } catch {
+      return
+    }
+    if ((await todayMinutes()) < goal) return
+    try {
+      localStorage.setItem(key, '1')
+    } catch {
+      // no es grave
+    }
+    setGoalDone(goal)
+    setTimeout(() => setGoalDone(null), 4500)
+  }
   /** tamaño de letra mientras se pellizca (se aplica al soltar) */
   const [pinchSize, setPinchSize] = useState<number | null>(null)
   /** brillo mientras se desliza el borde izquierdo */
@@ -99,6 +121,7 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   const back = useCallback(async () => {
     clearTimeout(saveTimer.current)
+    await flushStats()
     await saveNow()
     await refreshLibrary()
     closeBook()
@@ -268,6 +291,14 @@ export default function Reader({ bookId }: { bookId: string }) {
     const callbacks: EngineCallbacks = {
       onRelocate(l) {
         if (l.minutesLeft) trackPace(l.minutesLeft.total)
+        // estadísticas: cada página nueva suma el tiempo leído (sin pausas largas)
+        if (l.location !== lastLocation.current) {
+          if (lastLocation.current) {
+            notePageTurn(bookId)
+            checkGoal()
+          }
+          lastLocation.current = l.location
+        }
         setLoc(l)
         pending.current = l
         clearTimeout(saveTimer.current)
@@ -300,6 +331,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         if (!record) throw new Error('Libro no encontrado')
         setBook(record)
         resetPaceSession()
+        startReadingSession(bookId)
         const [blob, progress] = await Promise.all([platform.readBlob(record.path), db.progress.get(bookId)])
         if (cancelled || !stageRef.current) return
         engine = record.format === 'pdf' ? new PdfEngine(callbacks) : new EpubEngine(callbacks)
@@ -766,6 +798,11 @@ export default function Reader({ bookId }: { bookId: string }) {
       {panel === 'comfort' && book && <ComfortPanel bookId={bookId} format={isReflowable(book.format) ? 'epub' : 'pdf'} onClose={() => setPanel(null)} />}
 
       <div className="reader-dim" style={{ opacity: (1 - (brightnessPreview ?? settings.brightness)) * 0.9 }} aria-hidden />
+      {goalDone !== null && (
+        <div className="goal-toast" role="status">
+          <Icon name="check" size={18} /> ¡Cumpliste tu meta de hoy! ({goalDone} min)
+        </div>
+      )}
       {pinchSize !== null && (
         <div className="gesture-bubble" role="status">
           <Icon name="text" size={18} /> {pinchSize} px

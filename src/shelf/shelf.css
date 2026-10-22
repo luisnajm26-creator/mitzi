@@ -575,3 +575,113 @@
   gap: 8px;
   margin-left: auto;
 }
+
+/* ---------- Tu lectura (estadísticas) ---------- */
+.stats-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+
+.stats-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+}
+
+.stats-card strong {
+  font-family: var(--title-font);
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.stats-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+}
+
+.stats-sub {
+  font-size: 12.5px;
+  opacity: 0.7;
+}
+
+.stats-goal {
+  display: block;
+  height: 5px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.stats-goal > span {
+  display: block;
+  height: 100%;
+  background: #fff6e6;
+}
+
+.stats-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  height: 130px;
+  margin-bottom: 14px;
+}
+
+.stats-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.stats-day[data-today='true'] {
+  opacity: 1;
+  font-weight: 700;
+}
+
+.stats-bar {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  max-width: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.stats-bar > span {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 2px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fff6e6, #d9c7f2);
+}
+
+.stats-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-bottom: 14px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.stats-totals strong {
+  font-weight: 800;
+}
+
+.stats-goal-picker {
+  margin-bottom: 4px;
+}

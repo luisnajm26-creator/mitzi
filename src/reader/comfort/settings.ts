@@ -45,6 +45,8 @@ export interface ComfortSettings {
   pageSound: boolean
   /** vibración leve al pasar página (teléfono) */
   haptics: boolean
+  /** meta de lectura diaria en minutos (0 = sin meta); se usa la general, no la de cada libro */
+  dailyGoal: number
 }
 
 export const DEFAULT_SETTINGS: ComfortSettings = {
@@ -75,6 +77,7 @@ export const DEFAULT_SETTINGS: ComfortSettings = {
   chapterOrnament: true,
   pageSound: false,
   haptics: true,
+  dailyGoal: 0,
 }
 
 interface ReaderSettingsState {

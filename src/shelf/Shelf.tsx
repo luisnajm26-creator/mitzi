@@ -9,6 +9,7 @@ import { carouselBooks, useLibraryQuery, type CarouselFilter } from '../library/
 import { Explorer } from './Explorer'
 import { About } from './About'
 import { UpdateToast } from './UpdateToast'
+import { StatsPanel } from './StatsPanel'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
 import { AmbientBackground } from './AmbientBackground'
 import { CLOSE_MS, createMotion, OPEN_MS, Shelf3D } from './Shelf3D'
@@ -36,6 +37,7 @@ export function Shelf({ active }: { active: boolean }) {
   const failed = useLibrary(s => s.failed)
   const [failedOpen, setFailedOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  const [statsOpen, setStatsOpen] = useState(false)
   const openBook = useApp(s => s.openBook)
   const motion = useMemo(createMotion, [])
   const [center, setCenter] = useState(0)
@@ -174,6 +176,11 @@ export function Shelf({ active }: { active: boolean }) {
               <Icon name="search" />
             </button>
           )}
+          {allBooks.length > 0 && (
+            <button className="icon-button" onClick={() => setStatsOpen(true)} title="Tu lectura" aria-label="Tu lectura">
+              <Icon name="chart" />
+            </button>
+          )}
           <button className="icon-button" onClick={() => setFoldersOpen(true)} title="Carpetas de libros">
             <Icon name="folder" />
           </button>
@@ -240,6 +247,7 @@ export function Shelf({ active }: { active: boolean }) {
       )}
       {failedOpen && <FailedPanel onClose={() => setFailedOpen(false)} />}
       {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
+      {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
       {/* mientras se leen libros, arriba está ese aviso: este espera */}
       {!scanning && <UpdateToast />}
       {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}

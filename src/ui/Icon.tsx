@@ -33,6 +33,7 @@ const paths = {
   user: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0',
   notes: 'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5',
   translate: 'M4 5h8M8 3v2M6 5c0 4 3 7 6 8M10 5c-1 4-4 7-7 8M13 21l4-9 4 9M14.5 18h5',
+  chart: 'M5 20V11M11 20V5M17 20v-7M3 20h18',
 } as const
 
 export type IconName = keyof typeof paths
