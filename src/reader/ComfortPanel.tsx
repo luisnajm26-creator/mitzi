@@ -175,7 +175,7 @@ export function ComfortPanel({ bookId, format, onClose }: Props) {
         <Toggle label="Mantener la pantalla encendida" checked={s.keepAwake} onChange={v => set({ keepAwake: v })} />
       </Section>
 
-      {/* en Android la WebView no deja hablar con un servidor sin https: solo en la PC */}
+      {/* solo en la PC: el servidor de voz corre ahí, y Android bloquea las conexiones http sin cifrar */}
       {platform.kind !== 'android' && <VoiceServerSection />}
 
       <Section title="Aplicar a">

@@ -21,7 +21,10 @@ Se hizo con ayuda de Claude: el autor define la idea, el diseño y las pruebas. 
 | `npm run build` | `tsc -b` + `vite build` + compila `electron/` |
 | `npm run typecheck` | Solo tipos (web y Electron) |
 | `npm run electron` | Abre la app de escritorio con lo compilado |
-| `npm run android` | Compila web, `cap sync` y `gradlew assembleDebug`; deja `release/Mitzi-0.1.0-debug.apk`. Con `-- --install` lo instala por USB |
+| `npm run android` | Compila web, `cap sync` y `gradlew assembleDebug`; deja `release/Mitzi-<versión>-debug.apk`. Con `-- --install` lo instala por USB; con `-- --release`, el APK firmado para publicar |
+| `npm run instalador` | `build` + electron-builder: `release/Mitzi-Setup-<versión>.exe` (NSIS, por usuario) |
+| `npm run llave` | Crea la llave de firma del APK en `~/.mitzi` (fuera del repo). La crea el autor, una sola vez, y la respalda |
+| `npm run publicar` | Instalador + APK firmado + `SHA256SUMS.txt`; con `-- --subir` crea el Release en GitHub. **Lo ejecuta el autor**, no Claude |
 | `npm run demo` | Genera libros de prueba en `libros-prueba/demo` |
 | `npx electron scripts/generar-iconos.mjs` | Regenera los íconos PNG desde los SVG |
 
@@ -32,20 +35,26 @@ Se hizo con ayuda de Claude: el autor define la idea, el diseño y las pruebas. 
 ```
 src/
   main.tsx            importa primero lib/polyfills (navegadores internos viejos)
-  app/                App (arranque y orden de carga), store (vista actual), back.ts (gesto atrás), splash.ts
+  app/                App (arranque y orden de carga), store (vista actual), back.ts (gesto atrás), splash.ts,
+                      updates.ts (actualizaciones), author.ts (datos del autor y créditos)
   platform/           Platform: una implementación por plataforma (web, electron, android); index.ts elige
   library/            db.ts (Dexie), scanner.ts (carpetas → libros), metadata.ts (título, portada, serie),
-                      palette.ts, series.ts, query.ts (filtros/grupos del explorador), store.ts
+                      formats.ts, palette.ts, series.ts, query.ts (filtros/grupos del explorador), store.ts,
+                      stats.ts (minutos y páginas por día)
   shelf/              Shelf (biblioteca), Shelf3D + textures + LightRig + carousel (three.js),
-                      Explorer (buscador), AmbientBackground
-  reader/             Reader.tsx (pantalla de lectura, gestos, barras, paneles)
-    engines/          ReaderEngine: epubEngine (foliate-js), pdfEngine + pdfjs.ts, plates.ts (láminas)
+                      Explorer (buscador), AmbientBackground, About, StatsPanel, UpdateToast
+  reader/             Reader.tsx (pantalla de lectura, gestos, barras, paneles), SearchPanel, pace.ts
+                      (tiempo que falta), lookup.ts (definir/traducir), paperSound.ts
+    engines/          ReaderEngine: epubEngine (foliate-js), pdfEngine + pdfjs.ts, plates.ts (láminas),
+                      hyphenate.ts (guiones suaves)
     pageTurn/         PageFlip (hoja que gira), geometry (doblez), epubGhost (copias del capítulo)
     layouts/          OpenBook (libro abierto: tapa, cantos, sombra del lomo)
     comfort/          temas, contraste automático, fuentes, ajustes, CSS que se inyecta al EPUB
-    annotations/ tts/ subrayados y notas; lectura en voz alta
+    annotations/      subrayados, notas y marcadores
+    tts/              lectura en voz alta: backends.ts (sistema, Android y servidor de voz local), VoiceServer
   ui/                 Icon, Picker (selector propio, hoja desde abajo en el teléfono)
-electron/             main.ts (protocolo mitzi://, ventana), library.ts (carpetas, fs.watch), preload.cts
+electron/             main.ts (protocolo mitzi://, ventana, CSP), library.ts (carpetas, fs.watch), updater.ts, preload.cts
+scripts/              android.mjs, crear-llave.mjs, publicar.mjs, entorno.mjs (busca Java, SDK, llave y versión)
 shared/native-api.ts  tipos del puente Electron
 android/app/src/main/java/.../MitziLibraryPlugin.java   carpetas con SAF, escaneo, lectura, 120 Hz
 vendor/foliate-js/    submódulo git (motor EPUB). No se modifica: los arreglos van en src/
@@ -56,7 +65,13 @@ docs/pruebas/         listas de pruebas que el autor sigue en sus equipos
 
 - **Platform** (`src/platform/types.ts`): `scan()` devuelve `{ files, complete }`; `readBlob(path)` entrega el libro como Blob (en Android el plugin lo copia a la caché y se pide con `fetch(convertFileSrc(...))`). Si una carpeta no se pudo recorrer (`complete: false`), no se da ningún libro por perdido.
 - **Escáner** (`library/scanner.ts`): identifica cada libro por SHA-256 (por bloques en Android), con límite de 90 s por libro y un reintento por sesión de los que fallaron. Los fallos quedan en `db.files` con el motivo y se muestran en «N libros no se pudieron leer». Las portadas van aparte en `db.covers`; si el EPUB no declara portada se usa la imagen de su primera página.
-- **Base de datos** (`library/db.ts`, Dexie, versión 3): agregar un campo **indexado** requiere una versión nueva con migración; un campo opcional sin índice no.
+- **Base de datos** (`library/db.ts`, Dexie, versión 5: v4 marcadores, v5 `readingDays`): agregar un campo **indexado** o una tabla requiere una versión nueva; un campo opcional sin índice no.
+- **Formatos** (`library/formats.ts`): EPUB, MOBI/AZW/AZW3, FB2 y CBZ los abre foliate; PDF, pdf.js. Los de maquetación fija (CBZ, `view.isFixedLayout`) no reciben estilos ni hoja que gira. Al agregar un formato: `formats.ts`, `BOOK_EXT` de `vite.config.ts`, `BOOK_EXTENSIONS` del plugin de Android y los filtros de `AndroidManifest.xml`.
+- **Separación silábica** (`engines/hyphenate.ts`): al cargar cada capítulo se insertan guiones suaves (librería `hyphen`), porque Chromium en Windows no trae diccionarios. Se insertan siempre (con la opción apagada, `hyphens: none`) para que los CFI no cambien al activarla. La búsqueda de foliate los ignora; la selección y la voz los quitan.
+- **Actualizaciones** (`app/updates.ts`, `electron/updater.ts`, `installUpdate` del plugin): se pregunta a la API de Releases de GitHub una vez al día; se descarga el `.exe` o `.apk`, se compara su SHA-256 con `SHA256SUMS.txt` y se instala. Solo se aceptan URL de `github.com/luisnajm26-creator/mitzi/releases/download/`. En Electron solo funciona en la app instalada.
+- **Firma del APK** (`android/app/build.gradle`): la versión sale de `package.json`; si existe `~/.mitzi/keystore.properties`, release **y debug** se firman con esa llave (así las actualizaciones se instalan encima). Cambiar de llave obliga a desinstalar.
+- **Estadísticas** (`library/stats.ts`): cada cambio de página suma el tiempo desde el anterior si fue menos de 3 min; foliate avisa dos veces por página, así que solo cuenta páginas con 400 ms o más de diferencia.
+- **Voces naturales** (`tts/backends.ts`): en la PC se combinan las voces del sistema con las de un servidor local con la API de OpenAI (`/v1/audio/voices`, `/v1/audio/speech`; ids con prefijo `srv:`). Si el servidor no responde, esa oración se lee con la voz del sistema. En Android no se ofrece: el servidor corre en una PC y Android bloquea las conexiones `http` sin cifrar.
 - **Arranque** (`app/App.tsx`, `index.html`, `app/splash.ts`): la pantalla de inicio está en `index.html` para verse al instante; se quita cuando el libro central del carrusel ya está dibujado. Recién entonces se revisan las carpetas y se precarga el lector.
 - **Lector EPUB**: foliate pagina cada capítulo como columnas CSS dentro de un iframe. El evento `load` llega antes de maquetar; `plates.ts` reacciona a los cambios de estilo de `<html>` (cuando foliate maqueta) para agrandar las ilustraciones.
 - **Hoja que gira** (`pageTurn/PageFlip.ts`): copias exactas de las páginas (iframes «fantasma» que clonan el capítulo) recortadas por la línea del doblez. Cada hoja es caja › recorte › contenido, y en cada cuadro **solo cambian transformaciones** (nada de `clip-path`): así va fluida a 120 Hz en el teléfono. Con una sola página, el reverso es papel liso.
@@ -71,12 +86,15 @@ docs/pruebas/         listas de pruebas que el autor sigue en sus equipos
 - **Verificar el giro de página** congelándolo: `window.__mitziFlipFreeze = 0.5` (y `__mitziFlipSlow = 10` para verlo lento). Probar hacia adelante y hacia atrás, en libro abierto y en una página (tamaño teléfono), y **leer el texto de cada página** en la captura, no solo que «se vea bien».
 - **Frecuencia de pantalla:** pedir 120 Hz al tocar (no al empezar la animación) y mantenerla unos segundos; cambiar de 60 a 120 Hz a mitad del giro lo traba.
 - **Vite a veces sirve un módulo viejo** tras muchos cambios: reiniciar el servidor de desarrollo.
+- **Gestos dentro del iframe del EPUB:** `epubEngine` frena los toques con `stopImmediatePropagation` para que foliate no pase página por su cuenta. Un gesto nuevo (como pellizcar) debe registrar sus oyentes **antes** de ese bloqueo o nunca recibe los eventos.
+- **Panel del navegador oculto:** si la vista previa no está a la vista, `requestAnimationFrame` no corre y el giro de página se queda a medias. No es un error de la app; mostrar el panel antes de probar animaciones.
+- **CSP de Electron** (`electron/main.ts`): toda dirección nueva a la que la app haga `fetch` (GitHub, servidor de voz…) debe agregarse a `connect-src`.
 
 ## Entorno de esta PC (Windows 11)
 
 - Java: Microsoft OpenJDK 21 en `C:\Program Files\Microsoft\jdk-21*`. Android SDK en `%LOCALAPPDATA%\Android\Sdk` (sin Android Studio). `scripts/android.mjs` los encuentra solo.
 - PowerShell 5.1: no hay `&&`; usar `.\gradlew.bat` (no busca en la carpeta actual). Las rutas muy largas fallan: poner scripts auxiliares en `%TEMP%`.
-- En Bash, los heredocs con comillas invertidas o apóstrofos a veces fallan: escribir un script de Python y ejecutarlo.
+- En Bash, los heredocs con comillas invertidas o apóstrofos a veces fallan, y las barras invertidas pueden quedar a la mitad (rompe expresiones regulares y `\n` en Java o TS): para código con `\`, usar las herramientas de edición de archivos o un script de Python.
 
 ## Forma de trabajar
 
