@@ -90,13 +90,13 @@ Los motores de EPUB y PDF comparten una misma interfaz (`src/reader/engines/type
 
 ## Cómo se hizo
 
-Mitzi se hizo con ayuda de Claude, una IA de Anthropic. La idea, el diseño, las decisiones y las pruebas en dispositivos reales (PC con Windows, Huawei Pura 70 Ultra y MatePad 11.5) son del autor; la IA escribió gran parte del código. Lo digo abiertamente porque es parte de cómo se programa hoy, y porque el proyecto también es mi forma de aprender: las partes nuevas las voy escribiendo yo con su guía.
+Mitzi se hizo con ayuda de Claude, una IA de Anthropic. La idea, el diseño, las decisiones y las pruebas en dispositivos reales (PC con Windows, Huawei Pura 70 Ultra y MatePad 11.5) son mías; la IA escribió gran parte del código. Lo digo abiertamente porque así se programa hoy, y porque este proyecto también es mi forma de aprender: poco a poco voy escribiendo yo las partes nuevas, con su guía.
 
 ## Autor
 
-**Luis Angel Lopez** · [GitHub](https://github.com/luisnajm26-creator)
+Hola, soy **Luis A.** Hice Mitzi por puro gusto personal, a raíz de mi afición reciente por la lectura. Si te interesa hacer un proyecto juntos, me encantará que me contactes: [GitHub](https://github.com/luisnajm26-creator) · luisnajm26@gmail.com
 
-¿Tienes un proyecto en mente? Escríbeme desde mi perfil de GitHub o desde **Acerca de Mitzi** en la app.
+> *The Universe is, and we are.*
 
 ## Créditos
 

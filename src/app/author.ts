@@ -8,10 +8,11 @@
 export const AUTHOR = {
   name: 'Luis Angel Lopez',
   /** Una frase corta, con tus palabras. Ej.: «Desarrollador en formación · apps para PC y Android». */
-  tagline: '',
+  tagline:
+    'Hola, soy Luis A. Hice Mitzi por puro gusto personal, a raíz de mi afición reciente por la lectura. Si te interesa hacer un proyecto juntos, me encantará que me contactes. «The Universe is, and we are.»',
   github: 'https://github.com/luisnajm26-creator',
   /** Correo para proyectos. Vacío: el botón de contacto lleva a tu GitHub. */
-  email: '',
+  email: 'luisnajm26@gmail.com',
   linkedin: '',
   /** Enlace de apoyo voluntario (Ko-fi, GitHub Sponsors…). Opcional. */
   support: '',
