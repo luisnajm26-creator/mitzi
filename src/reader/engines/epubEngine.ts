@@ -56,6 +56,12 @@ export class EpubEngine implements ReaderEngine {
   #annotations = new Map<string, AnnotationRecord>()
   #annotationTapAt = 0
   #hadSelection = false
+  /** el texto de la página que se ve (para que la selección no se pase a otra) */
+  #visibleRange: Range | null = null
+  /** dónde empieza la página que se ve (desplazamiento del contenido de foliate) */
+  #pageStart = 0
+  /** pasando de página o saltando: ese desplazamiento sí es a propósito */
+  #navigating = 0
   /** idioma del libro (para la separación silábica) */
   #lang: string | undefined
   /** secciones con las que termina un capítulo del índice */
@@ -81,6 +87,14 @@ export class EpubEngine implements ReaderEngine {
     if (!view.isFixedLayout) await prepareHyphenation(this.#lang)
     this.#chapterEnds = chapterEnds(view)
     view.addEventListener('relocate', e => this.#onRelocate((e as CustomEvent<RelocateDetail>).detail))
+    // al arrastrar una manija de selección contra el borde, el navegador corre el contenido
+    // por su cuenta y la página queda a medias: mientras haya selección, se regresa a su lugar
+    view.renderer.addEventListener('scroll', () => {
+      const r = view.renderer
+      if (this.#navigating || r.getAttribute('flow') === 'scrolled' || !this.#selecting()) return
+      const off = this.#pageStart - r.start
+      if (Math.abs(off) > 1) r.scrollBy(off, 0)
+    })
     view.addEventListener('load', e => {
       const { doc, index } = (e as CustomEvent<{ doc: Document; index: number }>).detail
       this.#attach(doc, index)
@@ -138,22 +152,32 @@ export class EpubEngine implements ReaderEngine {
   }
 
   // el giro lo anima Mitzi (la hoja de papel): foliate cambia de página al instante
+  /** Marca la navegación para que la protección de la selección no la frene (ver el oyente de 'scroll'). */
+  async #navigate(go: () => Promise<unknown> | undefined) {
+    this.#navigating++
+    try {
+      await go()
+    } finally {
+      this.#navigating--
+    }
+  }
+
   next() {
     this.#view?.renderer.toggleAttribute('animated', !this.#flipEnabled)
-    return this.#view?.next() ?? Promise.resolve()
+    return this.#navigate(() => this.#view?.next())
   }
 
   prev() {
     this.#view?.renderer.toggleAttribute('animated', !this.#flipEnabled)
-    return this.#view?.prev() ?? Promise.resolve()
+    return this.#navigate(() => this.#view?.prev())
   }
 
-  async goTo(target: string) {
-    await this.#view?.goTo(target)
+  goTo(target: string) {
+    return this.#navigate(() => this.#view?.goTo(target))
   }
 
-  async goToFraction(fraction: number) {
-    await this.#view?.goToFraction(fraction)
+  goToFraction(fraction: number) {
+    return this.#navigate(() => this.#view?.goToFraction(fraction))
   }
 
   toc() {
@@ -295,6 +319,8 @@ export class EpubEngine implements ReaderEngine {
   }
 
   #onRelocate(d: RelocateDetail) {
+    this.#visibleRange = d.range ?? null
+    this.#pageStart = this.#view?.renderer.start ?? 0
     this.#callbacks.onRelocate({
       fraction: d.fraction ?? 0,
       location: d.cfi,
@@ -303,6 +329,37 @@ export class EpubEngine implements ReaderEngine {
       // en los cómics el «tiempo» de foliate saldría del peso de las imágenes: no sirve
       minutesLeft: d.time && !this.#view?.isFixedLayout ? { section: d.time.section, total: d.time.total } : undefined,
     })
+  }
+
+  /** ¿Hay texto seleccionado en el capítulo que se ve? */
+  #selecting() {
+    return (this.#view?.renderer.getContents() ?? []).some(({ doc }) => {
+      const sel = doc.getSelection()
+      return !!sel && sel.rangeCount > 0 && !sel.isCollapsed
+    })
+  }
+
+  /**
+   * La selección no puede pasar de la página que se ve. Si una manija llega al borde,
+   * foliate pasa de página por su cuenta para seguir seleccionando: esa vuelta no pasa
+   * por Mitzi (ni la hoja que gira ni el avance) y el libro quedaba desacomodado, con
+   * texto de otra página seleccionado. Aquí la selección se corta en el borde.
+   */
+  #keepSelectionInPage(doc: Document) {
+    const page = this.#visibleRange
+    const sel = doc.getSelection()
+    if (!page || page.startContainer.ownerDocument !== doc || !sel || !sel.rangeCount || sel.isCollapsed) return
+    if (this.#view?.renderer.getAttribute('flow') === 'scrolled') return
+    const range = sel.getRangeAt(0)
+    const pastEnd = range.compareBoundaryPoints(Range.END_TO_END, page) > 0
+    const beforeStart = range.compareBoundaryPoints(Range.START_TO_START, page) < 0
+    if (!pastEnd && !beforeStart) return
+    const start = beforeStart ? page : range
+    const end = pastEnd ? page : range
+    // se conserva qué extremo es el que se arrastra
+    const anchorFirst = sel.anchorNode === range.startContainer && sel.anchorOffset === range.startOffset
+    if (anchorFirst) sel.setBaseAndExtent(start.startContainer, start.startOffset, end.endContainer, end.endOffset)
+    else sel.setBaseAndExtent(end.endContainer, end.endOffset, start.startContainer, start.startOffset)
   }
 
   /** Los toques y teclas ocurren dentro del iframe del libro; se pasan a la interfaz. */
@@ -331,6 +388,7 @@ export class EpubEngine implements ReaderEngine {
     }
     let selTimer: ReturnType<typeof setTimeout> | undefined
     doc.addEventListener('selectionchange', () => {
+      this.#keepSelectionInPage(doc)
       clearTimeout(selTimer)
       selTimer = setTimeout(checkSelection, 350)
     })

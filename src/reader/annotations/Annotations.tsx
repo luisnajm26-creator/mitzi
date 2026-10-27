@@ -14,12 +14,21 @@ export const HIGHLIGHT_COLORS: { id: HighlightColor; label: string }[] = [
 ]
 
 const MENU_W = 300
+/** espacio para las manijas de selección de Android, que cuelgan debajo del texto */
+const HANDLES = 40
 
 /** Coloca un menú flotante encima (o debajo) del texto, sin salirse de la pantalla. */
 function floatingStyle(rect: DOMRect, height = 52, width = MENU_W): CSSProperties {
   const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)
-  // en pantallas táctiles Android pone su propio menú arriba: el nuestro va abajo
-  const below = isTouchDevice || rect.top < height + 70
+  if (isTouchDevice) {
+    // Android pone su propio menú arriba: el nuestro va abajo, sin tapar las manijas;
+    // si no cabe (selección hasta el final de la página), arriba; y si tampoco, en la orilla de arriba
+    const below = rect.bottom + HANDLES
+    const above = rect.top - height - 70
+    const top = below + height < window.innerHeight - 8 ? below : above > 8 ? above : 8
+    return { left, top, width }
+  }
+  const below = rect.top < height + 70
   const top = below ? Math.min(rect.bottom + 12, window.innerHeight - height - 12) : rect.top - height - 10
   return { left, top, width }
 }
@@ -56,12 +65,18 @@ interface SelectionMenuProps {
 export function SelectionMenu({ rect, text, theme, onHighlight, onNote, onShare }: SelectionMenuProps) {
   // el ancho depende de cuántos botones hay (Definir solo con una o dos palabras): se mide
   const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState<number | null>(null)
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
   useLayoutEffect(() => {
-    if (ref.current) setWidth(ref.current.offsetWidth)
+    if (ref.current) setSize({ w: ref.current.offsetWidth, h: ref.current.offsetHeight })
   }, [text, onShare])
-  // el menú toma el ancho de sus botones; la medida solo sirve para centrarlo sin salirse
-  const style: CSSProperties = { ...floatingStyle(rect, 52, width ?? MENU_W), width: 'max-content', visibility: width ? undefined : 'hidden' }
+  // el menú toma el ancho de sus botones (en el teléfono, si no caben, en dos filas);
+  // la medida sirve para colocarlo sin salirse de la pantalla
+  const style: CSSProperties = {
+    ...floatingStyle(rect, size?.h ?? 52, size?.w ?? MENU_W),
+    width: 'max-content',
+    maxWidth: window.innerWidth - 16,
+    visibility: size ? undefined : 'hidden',
+  }
   return (
     <div ref={ref} className="float-menu" style={style} role="toolbar" aria-label="Subrayar">
       <ColorDots theme={theme} onPick={onHighlight} />

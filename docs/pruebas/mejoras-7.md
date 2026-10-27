@@ -19,3 +19,16 @@ Al reportar algo, anota: **número de prueba, dispositivo, qué hiciste, qué es
 | 6 | Copia ese texto (Ctrl+C) y pégalo en el Bloc de notas | Las palabras de distintos renglones quedan separadas por un espacio o salto, no pegadas |
 | 7 | Selecciona una sola palabra (aparece **Definir**) y luego una frase larga | En los dos casos todos los botones caben dentro del menú, incluido **Compartir** |
 | 8 | Abre el panel de **Carpetas** | Dice que muestra EPUB, PDF, MOBI, AZW3, FB2 y CBZ |
+
+## Selección de texto en el teléfono
+
+**Lo que se arregló:** al arrastrar una manija contra el borde de la página, el navegador corría el libro por su cuenta y foliate pasaba de página sin avisar a Mitzi: se seleccionaba texto de otras páginas y el libro quedaba desacomodado. Ahora la selección se queda en la página que ves. Además, el menú de colores ya no tapa las manijas ni se sale de la pantalla.
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 9 | En el teléfono, mantén presionada una palabra de un EPUB | El menú sale debajo, con los colores arriba y los botones abajo, sin tapar las manijas |
+| 10 | Arrastra la manija final hasta el último renglón de la página | La selección llega hasta ahí; el menú se mueve arriba del texto |
+| 11 | Sigue empujando la manija contra el borde derecho o de abajo | La selección se queda en el final de la página: no toma texto de la siguiente y el libro no se mueve |
+| 12 | Achica la selección arrastrando la manija hacia atrás | Se achica sin saltos |
+| 13 | Toca fuera para quitar la selección y pasa de página | Pasa normal y la página queda alineada |
+| 14 | En la PC, selecciona un texto con el ratón y pulsa la flecha derecha | Pasa de página normalmente |

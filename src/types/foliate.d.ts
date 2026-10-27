@@ -63,6 +63,8 @@ declare module 'foliate-js/view.js' {
     readonly size: number
     /** desplazamiento actual del contenedor (px) */
     readonly start: number
+    /** desplaza el contenido dentro de los límites de la página actual */
+    scrollBy(dx: number, dy: number): void
     destroy(): void
   }
 
