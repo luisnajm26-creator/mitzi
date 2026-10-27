@@ -24,7 +24,7 @@ Se hizo con ayuda de Claude: el autor define la idea, el diseño y las pruebas. 
 | `npm run android` | Compila web, `cap sync` y `gradlew assembleDebug`; deja `release/Mitzi-<versión>-prueba.apk`, que se instala como otra app («Mitzi Prueba», id `….mitzi.prueba`) junto a la oficial. Con `-- --install` lo instala por USB; con `-- --release`, el APK firmado para publicar |
 | `npm run instalador` | `build` + electron-builder: `release/Mitzi-Setup-<versión>.exe` (NSIS, por usuario) |
 | `npm run llave` | Crea la llave de firma del APK en `~/.mitzi` (fuera del repo). La crea el autor, una sola vez, y la respalda |
-| `npm run publicar` | Instalador + APK firmado + `SHA256SUMS.txt`; con `-- --subir` crea el Release en GitHub. **Lo ejecuta el autor**, no Claude |
+| `npm run publicar` | Instalador + APK firmado + `SHA256SUMS.txt`; con `-- --subir` crea el Release en GitHub. Las novedades van en `docs/versiones/x.y.z.md`. **Solo cuando el autor lo pide** (es público) |
 | `npm run demo` | Genera libros de prueba en `libros-prueba/demo` |
 | `npx electron scripts/generar-iconos.mjs` | Regenera los íconos PNG desde los SVG |
 
