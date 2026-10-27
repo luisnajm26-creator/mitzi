@@ -6,6 +6,7 @@
 //
 // Uso:
 //   npm version patch          sube el número (patch = arreglos, minor = novedades, major = cambios grandes)
+//   docs/versiones/x.y.z.md     las novedades de esa versión (opcional)
 //   npm run publicar           arma los archivos en release/
 //   npm run publicar -- --subir   además crea la versión en GitHub (queda pública) con `gh`
 import { execSync } from 'node:child_process'
@@ -34,7 +35,10 @@ fs.writeFileSync(path.join(dir, 'SHA256SUMS.txt'), sums.join('\n') + '\n')
 console.log(`\nVersión ${v} lista en release/:\n  ${[...files, 'SHA256SUMS.txt'].join('\n  ')}\n`)
 
 const assets = [...files, 'SHA256SUMS.txt'].map(f => `"release/${f}"`).join(' ')
-const command = `gh release create v${v} ${assets} --title "Mitzi ${v}" --generate-notes`
+// novedades escritas a mano (las muestra la app al avisar de la actualización); si no hay, las de GitHub
+const notes = path.join(root, 'docs', 'versiones', `${v}.md`)
+const notesArg = fs.existsSync(notes) ? `--notes-file "${path.relative(root, notes)}"` : '--generate-notes'
+const command = `gh release create v${v} ${assets} --title "Mitzi ${v}" ${notesArg}`
 if (process.argv.includes('--subir')) {
   run(command)
   console.log('\nPublicada. Las apps instaladas la verán al abrirse.\n')
