@@ -503,7 +503,9 @@
   bottom: 0;
   width: min(380px, 100%);
   overflow-y: auto;
-  padding: max(14px, var(--sa-top)) 18px max(20px, var(--sa-bottom));
+  /* margen de arriba: el título (sticky) lo usa para tapar lo que se desliza por debajo */
+  --panel-top: max(14px, var(--sa-top));
+  padding: var(--panel-top) 18px max(20px, var(--sa-bottom));
   background: var(--r-surface);
   color: var(--r-fg);
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.18);
@@ -545,6 +547,8 @@
     border-top: 1px solid var(--r-border);
     border-radius: 20px 20px 0 0;
     animation: panel-up 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    /* sale desde abajo: no llega a la cámara, no necesita su margen */
+    --panel-top: 14px;
   }
 }
 
@@ -559,9 +563,9 @@
   align-items: center;
   justify-content: space-between;
   position: sticky;
-  top: -14px;
-  margin: -14px -18px 4px;
-  padding: 14px 18px 10px;
+  top: calc(-1 * var(--panel-top));
+  margin: calc(-1 * var(--panel-top)) -18px 4px;
+  padding: var(--panel-top) 18px 10px;
   background: var(--r-surface);
   z-index: 1;
 }
