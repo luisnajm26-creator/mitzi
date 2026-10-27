@@ -21,9 +21,11 @@ Mejor en **SVG** (vectorial). Si solo puede entregar PNG: 1024 × 1024 sin compr
 
 ## Cómo se cambia en el proyecto
 
-1. Ícono completo → `public/icon.svg`
-2. Primer plano de Android → `resources/icon-foreground.svg`
-3. Regenerar los PNG de Android y Windows: `npx electron scripts/generar-iconos.mjs`
+El ícono actual (libro con audífonos sobre la cama, de noche) está hecho en dos capas:
+
+1. Fondo → `resources/icon-background.svg` (108 × 108, ocupa todo)
+2. Dibujo → `resources/icon-foreground.svg` (108 × 108, transparente, dentro del círculo central de 66)
+3. `npx electron scripts/generar-iconos.mjs` arma con las dos el ícono completo (`public/icon.svg`) y genera los PNG de Android y Windows
 4. `npm run android` y `npm run instalador` para verlo en el teléfono y en la PC
 
 **Licencia:** el código de Mitzi es MIT. Acordar con el artista que el logo se pueda usar en el proyecto (y en sus copias) dándole crédito; el crédito va en `src/app/author.ts` (lista `CREDITS`) y en el README.

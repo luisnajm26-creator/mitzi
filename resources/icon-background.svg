@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <!-- Fondo del ícono: sábana a la luz de una lámpara (capa de atrás del ícono adaptable de Android) -->
+  <defs>
+    <linearGradient id="bg-sabana" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e9d9c1"/>
+      <stop offset="0.55" stop-color="#cdb699"/>
+      <stop offset="1" stop-color="#9c8263"/>
+    </linearGradient>
+    <radialGradient id="bg-lampara" cx="0.78" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#fff3da" stop-opacity="0.8"/>
+      <stop offset="0.5" stop-color="#ffe7c0" stop-opacity="0.25"/>
+      <stop offset="1" stop-color="#ffe7c0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg-vineta" cx="0.5" cy="0.45" r="0.75">
+      <stop offset="0.6" stop-color="#2b1e12" stop-opacity="0"/>
+      <stop offset="1" stop-color="#2b1e12" stop-opacity="0.35"/>
+    </radialGradient>
+  </defs>
+  <rect width="108" height="108" fill="url(#bg-sabana)"/>
+  <!-- pliegues de la sábana -->
+  <path d="M0 22 Q30 14 58 24 T108 18 L108 0 L0 0 Z" fill="#f1e5d2" opacity="0.7"/>
+  <path d="M0 34 Q22 40 40 31" stroke="#f3e8d8" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <path d="M70 12 Q86 20 108 14" stroke="#b9a283" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.6"/>
+  <path d="M0 92 Q34 80 66 94 T108 86 L108 108 L0 108 Z" fill="#a88d6b" opacity="0.7"/>
+  <path d="M60 100 Q84 92 108 98" stroke="#c9b394" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <path d="M92 40 Q100 62 108 66" stroke="#b39b7b" stroke-width="1.6" fill="none" stroke-linecap="round" opacity="0.5"/>
+  <rect width="108" height="108" fill="url(#bg-lampara)"/>
+  <rect width="108" height="108" fill="url(#bg-vineta)"/>
+</svg>
