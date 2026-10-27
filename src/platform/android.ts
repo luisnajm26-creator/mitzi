@@ -1,5 +1,5 @@
 import { App } from '@capacitor/app'
-import { Capacitor, registerPlugin, SystemBars, type PluginListenerHandle } from '@capacitor/core'
+import { Capacitor, registerPlugin, SystemBars, SystemBarType, type PluginListenerHandle } from '@capacitor/core'
 import type { BookFile, Platform } from './types'
 
 interface MitziLibraryPlugin {
@@ -13,6 +13,7 @@ interface MitziLibraryPlugin {
   openUrl(options: { url: string }): Promise<void>
   processText(options: { text: string }): Promise<{ handled: boolean }>
   haptic(): Promise<void>
+  safeArea(): Promise<{ top?: number; right?: number; bottom?: number; left?: number }>
   shareImage(options: { data: string; name: string }): Promise<void>
   installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
@@ -38,8 +39,29 @@ function folderLabel(uri: string) {
   return path ? `${root}/${path}` : root
 }
 
+/**
+ * Márgenes seguros (hueco de la cámara, barras visibles) como variables CSS. Los da el
+ * plugin: el de Capacitor no funciona en el navegador interno viejo de los Huawei.
+ */
+async function applySafeArea() {
+  try {
+    const area = await Library.safeArea()
+    const root = document.documentElement.style
+    for (const side of ['top', 'right', 'bottom', 'left'] as const) root.setProperty(`--mitzi-sa-${side}`, `${area[side] ?? 0}px`)
+  } catch {
+    // sin plugin: quedan los valores de env()
+  }
+}
+
 export function createAndroidPlatform(): Platform {
   let immersive = false
+  applySafeArea()
+  // al girar la pantalla o mostrar u ocultar barras cambian los márgenes
+  let resizeTimer: ReturnType<typeof setTimeout> | undefined
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer)
+    resizeTimer = setTimeout(applySafeArea, 150)
+  })
   return {
     kind: 'android',
     canManageFolders: true,
@@ -106,10 +128,13 @@ export function createAndroidPlatform(): Platform {
     },
     onFullscreenChanged: () => () => {},
     keepAwake: on => Library.setKeepAwake({ on }),
+    // la barra de notificaciones va oculta siempre (MainActivity); al leer se oculta también
+    // la de navegación
     async setImmersive(on) {
       immersive = on
-      if (on) await SystemBars.hide()
-      else await SystemBars.show()
+      if (on) await SystemBars.hide({ bar: SystemBarType.NavigationBar })
+      else await SystemBars.show({ bar: SystemBarType.NavigationBar })
+      setTimeout(applySafeArea, 300)
     },
     setHighRefresh: on => Library.setHighRefresh({ on }).catch(() => {}),
     onBackButton: cb => listen(() => App.addListener('backButton', cb)),

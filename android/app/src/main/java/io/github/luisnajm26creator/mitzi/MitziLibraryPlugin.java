@@ -329,6 +329,29 @@ public class MitziLibraryPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /**
+     * Márgenes que la app debe dejar libres, en píxeles CSS: el hueco de la cámara y las barras
+     * del sistema que estén a la vista (las ocultas no cuentan). Ver MainActivity.
+     */
+    @PluginMethod
+    public void safeArea(PluginCall call) {
+        getActivity()
+            .runOnUiThread(() -> {
+                JSObject ret = new JSObject();
+                android.view.WindowInsets raw = getActivity().getWindow().getDecorView().getRootWindowInsets();
+                float density = getContext().getResources().getDisplayMetrics().density;
+                if (raw != null) {
+                    androidx.core.graphics.Insets i = androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(raw)
+                        .getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() | androidx.core.view.WindowInsetsCompat.Type.displayCutout());
+                    ret.put("top", i.top / density);
+                    ret.put("right", i.right / density);
+                    ret.put("bottom", i.bottom / density);
+                    ret.put("left", i.left / density);
+                }
+                call.resolve(ret);
+            });
+    }
+
     /** Un toque de vibración muy leve (respeta la configuración del teléfono; no pide permisos). */
     @PluginMethod
     public void haptic(PluginCall call) {

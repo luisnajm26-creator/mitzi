@@ -11,6 +11,10 @@ const config: CapacitorConfig = {
     captureInput: false,
     webContentsDebuggingEnabled: true,
   },
+  plugins: {
+    // los márgenes de la pantalla los maneja Mitzi (MainActivity y platform/android.ts)
+    SystemBars: { insetsHandling: 'disable' },
+  },
 }
 
 export default config

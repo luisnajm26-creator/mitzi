@@ -195,7 +195,7 @@
   .share-body {
     flex-direction: column;
     gap: 14px;
-    padding: 4px 16px calc(18px + env(safe-area-inset-bottom));
+    padding: 4px 16px calc(18px + var(--sa-bottom));
   }
 
   /* sin flex: 1 la vista previa toma la altura de la imagen y no se encima con los controles */

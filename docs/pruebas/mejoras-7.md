@@ -32,3 +32,17 @@ Al reportar algo, anota: **número de prueba, dispositivo, qué hiciste, qué es
 | 12 | Achica la selección arrastrando la manija hacia atrás | Se achica sin saltos |
 | 13 | Toca fuera para quitar la selección y pasa de página | Pasa normal y la página queda alineada |
 | 14 | En la PC, selecciona un texto con el ratón y pulsa la flecha derecha | Pasa de página normalmente |
+
+## Pantalla completa y menú de selección solo de Mitzi (Android)
+
+**Lo que cambió:** la barra de notificaciones va oculta en toda la app (deslizando desde arriba aparece un momento) y el contenido llega hasta el borde de arriba, junto a la cámara, sin la franja negra. Al seleccionar texto ya no sale el menú del sistema (Copiar, Compartir, Traducir…): solo el de Mitzi.
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 15 | Abre Mitzi Prueba | No se ve la barra de notificaciones; el foco de luz de la biblioteca llega hasta arriba |
+| 16 | Desliza hacia abajo desde el borde de arriba | La barra aparece un momento y se vuelve a ocultar sola |
+| 17 | Abre un libro | La página llena la pantalla con su color hasta arriba (sin franja negra) y el texto no queda debajo de la cámara |
+| 18 | Toca el centro para ver las barras del lector | Los botones de arriba quedan debajo de la cámara, todos tocables |
+| 19 | Gira el teléfono (o usa la MatePad en horizontal) | Nada queda debajo de la cámara ni de la barra de navegación |
+| 20 | Mantén presionada una palabra y luego arrastra las manijas | Solo aparece el menú de Mitzi, nunca el del sistema, ni al soltar las manijas |
+| 21 | Sal a otra app y vuelve | La barra de notificaciones sigue oculta |

@@ -7,11 +7,11 @@
   --glass-strong: rgba(26, 22, 36, 0.88);
   --glass-border: rgba(255, 255, 255, 0.12);
   --accent: #c9b6ff;
-  /* márgenes seguros (muesca, barras): Capacitor los inyecta en Android, en PC vale env() */
-  --sa-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
-  --sa-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
-  --sa-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
-  --sa-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  /* márgenes seguros (cámara, barras): en Android los pone platform/android.ts; si no, env() */
+  --sa-top: var(--mitzi-sa-top, env(safe-area-inset-top, 0px));
+  --sa-right: var(--mitzi-sa-right, env(safe-area-inset-right, 0px));
+  --sa-bottom: var(--mitzi-sa-bottom, env(safe-area-inset-bottom, 0px));
+  --sa-left: var(--mitzi-sa-left, env(safe-area-inset-left, 0px));
   color-scheme: dark;
 }
 
