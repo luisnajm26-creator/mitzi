@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- La versión de prueba se instala junto a la oficial (otro applicationId, ver build.gradle)
+     y se distingue por el nombre -->
+<resources>
+    <string name="app_name">Mitzi Prueba</string>
+    <string name="title_activity_main">Mitzi Prueba</string>
+</resources>

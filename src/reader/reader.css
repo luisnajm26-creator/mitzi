@@ -995,6 +995,27 @@
   color: transparent;
 }
 
+/* los saltos de renglón de pdf.js quedan en el borde de la página y Chrome pinta su
+   selección como una franja junto al lomo (ni ::selection ni opacity la quitan).
+   Se ocultan; el texto seleccionado los recupera en pdfEngine (textOf) */
+.textLayer br {
+  display: none;
+}
+
+/* pdf.js estira este elemento mientras se arrastra para que la selección no salte */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.textLayer.selecting .endOfContent {
+  top: 0;
+}
+
 /* ---------- menús de subrayado ---------- */
 .float-menu {
   position: absolute;

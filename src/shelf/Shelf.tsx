@@ -380,7 +380,7 @@ function FoldersPanel({ onClose }: { onClose(): void }) {
             <Icon name="close" />
           </button>
         </header>
-        <p className="sheet-note">Mitzi revisa estas carpetas (y sus subcarpetas) y muestra los EPUB y PDF que encuentre.</p>
+        <p className="sheet-note">Mitzi revisa estas carpetas (y sus subcarpetas) y muestra los libros que encuentre: EPUB, PDF, MOBI, AZW3, FB2 y CBZ.</p>
         <ul className="folder-list">
           {folders?.folders.map(folder => (
             <li key={folder}>

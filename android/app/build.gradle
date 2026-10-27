@@ -39,9 +39,10 @@ android {
         }
     }
     buildTypes {
-        // con la llave creada, también el APK de prueba va firmado con ella: así se puede
-        // pasar de uno a otro sin desinstalar (y sin perder lo leído)
+        // la versión de prueba es otra app («Mitzi Prueba»): se instala junto a la oficial
+        // sin tocarla, con sus propias carpetas y avance (nombre en src/debug/res)
         debug {
+            applicationIdSuffix '.prueba'
             if (hasReleaseKey) signingConfig signingConfigs.release
         }
         release {

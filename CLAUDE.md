@@ -21,7 +21,7 @@ Se hizo con ayuda de Claude: el autor define la idea, el diseño y las pruebas. 
 | `npm run build` | `tsc -b` + `vite build` + compila `electron/` |
 | `npm run typecheck` | Solo tipos (web y Electron) |
 | `npm run electron` | Abre la app de escritorio con lo compilado |
-| `npm run android` | Compila web, `cap sync` y `gradlew assembleDebug`; deja `release/Mitzi-<versión>-debug.apk`. Con `-- --install` lo instala por USB; con `-- --release`, el APK firmado para publicar |
+| `npm run android` | Compila web, `cap sync` y `gradlew assembleDebug`; deja `release/Mitzi-<versión>-prueba.apk`, que se instala como otra app («Mitzi Prueba», id `….mitzi.prueba`) junto a la oficial. Con `-- --install` lo instala por USB; con `-- --release`, el APK firmado para publicar |
 | `npm run instalador` | `build` + electron-builder: `release/Mitzi-Setup-<versión>.exe` (NSIS, por usuario) |
 | `npm run llave` | Crea la llave de firma del APK en `~/.mitzi` (fuera del repo). La crea el autor, una sola vez, y la respalda |
 | `npm run publicar` | Instalador + APK firmado + `SHA256SUMS.txt`; con `-- --subir` crea el Release en GitHub. **Lo ejecuta el autor**, no Claude |
@@ -83,6 +83,9 @@ docs/pruebas/         listas de pruebas que el autor sigue en sus equipos
 ## Trampas conocidas
 
 - **Navegador interno viejo en los Huawei.** No tienen Chrome actualizado: falló `Object.groupBy` (foliate) y ningún EPUB abría. Antes de usar una API de JavaScript reciente, revisar su versión de Chrome y agregar polyfill en `src/lib/polyfills.ts`. pdf.js usa su versión `legacy` cuando faltan APIs (`engines/pdfjs.ts`). En CSS también: las fichas del explorador se desarmaron allí (proporción con `aspect-ratio` dentro de un `<button>` flex) y se arreglaron con el truco clásico del relleno porcentual; para medidas críticas, preferir técnicas antiguas. Para simularlo en el navegador: borrar la API (`delete Object.groupBy`) y probar.
+- **El worker de pdf.js no recibe los polyfills** de la página: el «legacy» de pdf.js 6 usa `Promise.withResolvers` (Chrome 119) y en los Huawei (WebView 114) ningún PDF abría. Por eso arranca desde `engines/pdfWorker.ts`, que carga primero `lib/polyfills`. Todo polyfill nuevo que pdf.js necesite va ahí también.
+- **Probar en el teléfono por USB:** `adb` está en `%LOCALAPPDATA%\Android\Sdk\platform-tools`. En Git Bash usar `MSYS_NO_PATHCONV=1` (si no, `/data/local/tmp` se vuelve una ruta de Windows). La consola de la WebView no siempre sale en `logcat` en los Huawei: capturas con `adb exec-out screencap -p`. Probar en «Mitzi Prueba», nunca en la Mitzi oficial del autor.
+- **Texto seleccionado en PDF:** los `<br>` de pdf.js están ocultos (Chrome pintaba su selección como franja junto al lomo); el texto se arma con `textOf()` en `pdfEngine.ts`, también al copiar.
 - **foliate vuelve a limitar las imágenes** al ancho de una página cada vez que maqueta: hay que reaplicar los tamaños (ver `plates.ts`, que compara antes de escribir para no entrar en un ciclo).
 - **Recortes de la hoja:** cada `.flip-clip` necesita tamaño (lo pone `place()`); sin él la copia quieta desaparece y se ve la página nueva antes de tiempo.
 - **Verificar el giro de página** congelándolo: `window.__mitziFlipFreeze = 0.5` (y `__mitziFlipSlow = 10` para verlo lento). Probar hacia adelante y hacia atrás, en libro abierto y en una página (tamaño teléfono), y **leer el texto de cada página** en la captura, no solo que «se vea bien».

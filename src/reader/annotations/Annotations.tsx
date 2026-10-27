@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { lookup } from '../lookup'
 import type { AnnotationRecord, BookmarkRecord, HighlightColor } from '../../library/db'
 import { isTouchDevice, platform } from '../../platform'
@@ -13,15 +13,15 @@ export const HIGHLIGHT_COLORS: { id: HighlightColor; label: string }[] = [
   { id: 'lila', label: 'Lila' },
 ]
 
-const MENU_W = 336
+const MENU_W = 300
 
 /** Coloca un menú flotante encima (o debajo) del texto, sin salirse de la pantalla. */
-function floatingStyle(rect: DOMRect, height = 52): CSSProperties {
-  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - MENU_W / 2), window.innerWidth - MENU_W - 8)
+function floatingStyle(rect: DOMRect, height = 52, width = MENU_W): CSSProperties {
+  const left = Math.min(Math.max(8, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 8)
   // en pantallas táctiles Android pone su propio menú arriba: el nuestro va abajo
   const below = isTouchDevice || rect.top < height + 70
   const top = below ? Math.min(rect.bottom + 12, window.innerHeight - height - 12) : rect.top - height - 10
-  return { left, top, width: MENU_W }
+  return { left, top, width }
 }
 
 function ColorDots({ theme, current, onPick }: { theme: ThemeColors; current?: HighlightColor; onPick(c: HighlightColor): void }) {
@@ -54,8 +54,16 @@ interface SelectionMenuProps {
 
 /** Aparece al seleccionar texto: subrayar en un color, agregar nota, copiar o compartir. */
 export function SelectionMenu({ rect, text, theme, onHighlight, onNote, onShare }: SelectionMenuProps) {
+  // el ancho depende de cuántos botones hay (Definir solo con una o dos palabras): se mide
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    if (ref.current) setWidth(ref.current.offsetWidth)
+  }, [text, onShare])
+  // el menú toma el ancho de sus botones; la medida solo sirve para centrarlo sin salirse
+  const style: CSSProperties = { ...floatingStyle(rect, 52, width ?? MENU_W), width: 'max-content', visibility: width ? undefined : 'hidden' }
   return (
-    <div className="float-menu" style={floatingStyle(rect)} role="toolbar" aria-label="Subrayar">
+    <div ref={ref} className="float-menu" style={style} role="toolbar" aria-label="Subrayar">
       <ColorDots theme={theme} onPick={onHighlight} />
       <span className="float-sep" />
       <button className="float-action" onClick={onNote} title="Agregar nota">

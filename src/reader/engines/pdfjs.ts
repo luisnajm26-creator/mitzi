@@ -1,5 +1,4 @@
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import legacyWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
 type PdfJs = typeof import('pdfjs-dist')
 
@@ -29,7 +28,9 @@ function supportsModernPdfjs() {
 export function loadPdfjs() {
   const modern = supportsModernPdfjs()
   loading ??= (modern ? import('pdfjs-dist') : (import('pdfjs-dist/legacy/build/pdf.mjs') as Promise<PdfJs>)).then(pdfjs => {
-    pdfjs.GlobalWorkerOptions.workerSrc = modern ? workerUrl : legacyWorkerUrl
+    if (modern) pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+    // el worker «legacy» necesita los polyfills antes de arrancar (ver pdfWorker.ts)
+    else pdfjs.GlobalWorkerOptions.workerPort = new Worker(new URL('./pdfWorker.ts', import.meta.url), { type: 'module' })
     return pdfjs
   })
   return loading

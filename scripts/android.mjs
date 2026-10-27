@@ -29,7 +29,7 @@ run(win ? `.\\gradlew.bat ${task}` : `./gradlew ${task}`, { cwd: path.join(root,
 
 const kind = release ? 'release' : 'debug'
 const apk = path.join(root, 'android', 'app', 'build', 'outputs', 'apk', kind, `app-${kind}.apk`)
-const out = path.join(root, 'release', release ? `Mitzi-${version()}.apk` : `Mitzi-${version()}-debug.apk`)
+const out = path.join(root, 'release', release ? `Mitzi-${version()}.apk` : `Mitzi-${version()}-prueba.apk`)
 fs.mkdirSync(path.dirname(out), { recursive: true })
 fs.copyFileSync(apk, out)
 console.log(`\nAPK listo: ${path.relative(root, out)}`)

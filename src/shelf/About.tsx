@@ -60,7 +60,7 @@ export function About({ onClose }: { onClose(): void }) {
             <div className="about-version">Versión {__MITZI_VERSION__}</div>
           </div>
         </div>
-        <p className="sheet-note">Lector de EPUB y PDF, libre y de código abierto. No trae libros: tú agregas los tuyos y Mitzi los encuentra sola.</p>
+        <p className="sheet-note">Lector de libros electrónicos y cómics, libre y de código abierto. No trae libros: tú agregas los tuyos y Mitzi los encuentra sola.</p>
         {updatesSupported() && <UpdateCheck />}
 
         <section className="about-card">

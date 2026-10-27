@@ -13,6 +13,22 @@ type OutlineItem = Awaited<ReturnType<PDFDocumentProxy['getOutline']>>[number]
  */
 const PDF_MINUTES_PER_PAGE = 1.5
 
+/**
+ * Texto de una selección del PDF. Los saltos de renglón (<br> de pdf.js) están ocultos
+ * para que no pinten una franja junto al lomo, y un <br> oculto no cuenta en
+ * Selection.toString(): aquí se vuelven a poner.
+ */
+function textOf(range: Range) {
+  let text = ''
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.TEXT_NODE) text += (node as Text).data
+    else if (node.nodeName === 'BR') text += '\n'
+    else node.childNodes.forEach(walk)
+  }
+  walk(range.cloneContents())
+  return text.trim()
+}
+
 export class PdfEngine implements ReaderEngine {
   readonly format = 'pdf' as const
   #cb: EngineCallbacks
@@ -460,8 +476,8 @@ export class PdfEngine implements ReaderEngine {
 
   #checkSelection() {
     const sel = window.getSelection()
-    const text = sel?.toString().trim()
     const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null
+    const text = range ? textOf(range) : ''
     const node = range?.startContainer
     const wrap = (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.pdf-page')
     if (!sel || sel.isCollapsed || !text || !range || !wrap || !this.#stage.contains(wrap)) {
@@ -498,6 +514,13 @@ export class PdfEngine implements ReaderEngine {
 
   #bindInput() {
     document.addEventListener('selectionchange', this.#onSelectionChange)
+    // los saltos de renglón están ocultos (ver reader.css): al copiar se ponen a mano
+    this.#stage.addEventListener('copy', e => {
+      const sel = window.getSelection()
+      if (!sel?.rangeCount || !e.clipboardData) return
+      e.clipboardData.setData('text/plain', textOf(sel.getRangeAt(0)))
+      e.preventDefault()
+    })
     this.#stage.addEventListener('pointerup', () => setTimeout(() => this.#checkSelection(), 10))
     // arrastrar la hoja: los gestos se pasan a Mitzi
     const forward = (type: PointerInfo['type'], e: PointerEvent) =>
