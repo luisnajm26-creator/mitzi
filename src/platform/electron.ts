@@ -24,6 +24,8 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     keepAwake: on => api.keepAwake(on),
     // la ventana principal manda los enlaces externos al navegador (ver electron/main.ts)
     openExternal: url => void window.open(url, '_blank'),
+    saveImage: async (png, name) => api.saveImage(new Uint8Array(await png.arrayBuffer()), name),
+    copyImage: async png => api.copyImage(new Uint8Array(await png.arrayBuffer())),
     async installUpdate(info, onProgress) {
       const off = api.onUpdateProgress(onProgress)
       try {

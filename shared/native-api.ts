@@ -41,4 +41,7 @@ export interface MitziNativeApi {
   keepAwake(on: boolean): Promise<void>
   installUpdate(info: UpdateInfo): Promise<'installing'>
   onUpdateProgress(cb: (fraction: number) => void): () => void
+  /** Guarda una imagen PNG donde elija el usuario. false si canceló. */
+  saveImage(bytes: Uint8Array, name: string): Promise<boolean>
+  copyImage(bytes: Uint8Array): Promise<void>
 }

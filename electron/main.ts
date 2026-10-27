@@ -1,4 +1,5 @@
-import { app, BrowserWindow, dialog, ipcMain, net, powerSaveBlocker, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, net, powerSaveBlocker, protocol, shell } from 'electron'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { LibraryService } from './library.js'
@@ -101,6 +102,16 @@ function registerIpc() {
     return next
   })
   ipcMain.handle('update:install', (e, info: UpdateInfo) => installUpdate(info, fraction => e.sender.send('update:progress', fraction)))
+  // tarjetas para compartir citas: guardar como PNG o copiar al portapapeles
+  ipcMain.handle('image:save', async (_e, bytes: Uint8Array, name: string) => {
+    const options = { defaultPath: path.join(app.getPath('pictures'), name), filters: [{ name: 'Imagen PNG', extensions: ['png'] }] }
+    const { canceled, filePath } = await (win ? dialog.showSaveDialog(win, options) : dialog.showSaveDialog(options))
+    if (canceled || !filePath) return false
+    await writeFile(filePath, bytes)
+    return true
+  })
+  // Electron 44 usa el portapapeles al estilo web (ClipboardItem con un Blob)
+  ipcMain.handle('image:copy', (_e, bytes: Uint8Array) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(bytes)], { type: 'image/png' }) })]))
   ipcMain.handle('power:keep-awake', (_e, on: boolean) => {
     if (on && wakeLockId === null) wakeLockId = powerSaveBlocker.start('prevent-display-sleep')
     if (!on && wakeLockId !== null) {

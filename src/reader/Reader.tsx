@@ -18,6 +18,7 @@ import { bookColors, computeBookGeometry, OpenBookBase, OpenBookGutter } from '.
 import { PageFlip, type FlipContext } from './pageTurn/PageFlip'
 import { TocPanel } from './TocPanel'
 import { ReadAloudBar, useReadAloud } from './tts/ReadAloud'
+import { ShareSheet } from './share/ShareSheet'
 import { AnnotationPopover, NoteEditor, NotesPanel, SelectionMenu } from './annotations/Annotations'
 import type { AnnotationRecord, BookmarkRecord, HighlightColor } from '../library/db'
 import type { PointerInfo, TextSelection } from './engines/types'
@@ -81,6 +82,8 @@ export default function Reader({ bookId }: { bookId: string }) {
   const brightnessGesture = useRef<{ y: number; start: number; value: number } | null>(null)
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [tapped, setTapped] = useState<{ id: string; rect: DOMRect } | null>(null)
+  /** texto de la cita que se está convirtiendo en tarjeta para compartir */
+  const [sharing, setSharing] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [ttsOpen, setTtsOpen] = useState(false)
   const tts = useReadAloud({
@@ -721,8 +724,24 @@ export default function Reader({ bookId }: { bookId: string }) {
         />
       )}
       {selection && (
-        <SelectionMenu rect={selection.rect} text={selection.text} theme={theme} onHighlight={c => highlight(c)} onNote={() => highlight('amarillo', true)} />
+        <SelectionMenu
+          rect={selection.rect}
+          text={selection.text}
+          theme={theme}
+          onHighlight={c => highlight(c)}
+          onNote={() => highlight('amarillo', true)}
+          onShare={
+            book
+              ? () => {
+                  setSharing(selection.text)
+                  engineRef.current?.clearSelection()
+                  setSelection(null)
+                }
+              : undefined
+          }
+        />
       )}
+      {sharing && book && <ShareSheet text={sharing} book={book} theme={theme} fontId={settings.fontId} onClose={() => setSharing(null)} />}
       {tapped && tappedAnnotation && (
         <AnnotationPopover
           annotation={tappedAnnotation}

@@ -39,6 +39,12 @@ export interface Platform {
    * 'needs-permission': Android pidió permitir que Mitzi instale apps.
    */
   installUpdate?(info: UpdateInfo, onProgress: (fraction: number) => void): Promise<'installing' | 'needs-permission'>
+  /** Abre el menú de compartir del sistema con una imagen (Android). */
+  shareImage?(png: Blob, name: string): Promise<void>
+  /** Guarda una imagen donde elija el usuario (PC). false si canceló. */
+  saveImage?(png: Blob, name: string): Promise<boolean>
+  /** Copia una imagen al portapapeles (PC). */
+  copyImage?(png: Blob): Promise<void>
   /** Oculta las barras del sistema (Android) para leer a pantalla completa. */
   setImmersive?(on: boolean): Promise<void>
   /** Pide la frecuencia de pantalla más alta mientras hay animación (Android). */

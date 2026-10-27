@@ -13,7 +13,7 @@ export const HIGHLIGHT_COLORS: { id: HighlightColor; label: string }[] = [
   { id: 'lila', label: 'Lila' },
 ]
 
-const MENU_W = 300
+const MENU_W = 336
 
 /** Coloca un menú flotante encima (o debajo) del texto, sin salirse de la pantalla. */
 function floatingStyle(rect: DOMRect, height = 52): CSSProperties {
@@ -48,10 +48,12 @@ interface SelectionMenuProps {
   theme: ThemeColors
   onHighlight(color: HighlightColor): void
   onNote(): void
+  /** compartir como imagen (tarjeta para redes) */
+  onShare?(): void
 }
 
-/** Aparece al seleccionar texto: subrayar en un color, agregar nota o copiar. */
-export function SelectionMenu({ rect, text, theme, onHighlight, onNote }: SelectionMenuProps) {
+/** Aparece al seleccionar texto: subrayar en un color, agregar nota, copiar o compartir. */
+export function SelectionMenu({ rect, text, theme, onHighlight, onNote, onShare }: SelectionMenuProps) {
   return (
     <div className="float-menu" style={floatingStyle(rect)} role="toolbar" aria-label="Subrayar">
       <ColorDots theme={theme} onPick={onHighlight} />
@@ -71,6 +73,11 @@ export function SelectionMenu({ rect, text, theme, onHighlight, onNote }: Select
       <button className="float-action" onClick={() => lookup(text, 'translate')} title="Traducir">
         <Icon name="translate" size={19} />
       </button>
+      {onShare && (
+        <button className="float-action" onClick={onShare} title="Compartir como imagen">
+          <Icon name="share" size={19} />
+        </button>
+      )}
     </div>
   )
 }

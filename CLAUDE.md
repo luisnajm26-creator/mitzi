@@ -51,6 +51,7 @@ src/
     layouts/          OpenBook (libro abierto: tapa, cantos, sombra del lomo)
     comfort/          temas, contraste automático, fuentes, ajustes, CSS que se inyecta al EPUB
     annotations/      subrayados, notas y marcadores
+    share/            tarjetas para compartir citas: designs.ts (colores y formatos), card.ts (dibujo en canvas), ShareSheet
     tts/              lectura en voz alta: backends.ts (sistema, Android y servidor de voz local), VoiceServer
   ui/                 Icon, Picker (selector propio, hoja desde abajo en el teléfono)
 electron/             main.ts (protocolo mitzi://, ventana, CSP), library.ts (carpetas, fs.watch), updater.ts, preload.cts
@@ -72,6 +73,7 @@ docs/pruebas/         listas de pruebas que el autor sigue en sus equipos
 - **Firma del APK** (`android/app/build.gradle`): la versión sale de `package.json`; si existe `~/.mitzi/keystore.properties`, release **y debug** se firman con esa llave (así las actualizaciones se instalan encima). Cambiar de llave obliga a desinstalar.
 - **Estadísticas** (`library/stats.ts`): cada cambio de página suma el tiempo desde el anterior si fue menos de 3 min; foliate avisa dos veces por página, así que solo cuenta páginas con 400 ms o más de diferencia.
 - **Voces naturales** (`tts/backends.ts`): en la PC se combinan las voces del sistema con las de un servidor local con la API de OpenAI (`/v1/audio/voices`, `/v1/audio/speech`; ids con prefijo `srv:`). Si el servidor no responde, esa oración se lee con la voz del sistema. En Android no se ofrece: el servidor corre en una PC y Android bloquea las conexiones `http` sin cifrar.
+- **Compartir citas** (`reader/share/`): la tarjeta se dibuja en un canvas con la letra del lector, que antes se registra con `FontFace` en la página (las del libro viven en el iframe y el canvas no las ve). Android la manda al menú de compartir (`shareImage` del plugin, por FileProvider); en la PC se guarda o copia por IPC (`image:save`, `image:copy`; Electron 44 usa `clipboard.write` con `ClipboardItem`).
 - **Arranque** (`app/App.tsx`, `index.html`, `app/splash.ts`): la pantalla de inicio está en `index.html` para verse al instante; se quita cuando el libro central del carrusel ya está dibujado. Recién entonces se revisan las carpetas y se precarga el lector.
 - **Lector EPUB**: foliate pagina cada capítulo como columnas CSS dentro de un iframe. El evento `load` llega antes de maquetar; `plates.ts` reacciona a los cambios de estilo de `<html>` (cuando foliate maqueta) para agrandar las ilustraciones.
 - **Hoja que gira** (`pageTurn/PageFlip.ts`): copias exactas de las páginas (iframes «fantasma» que clonan el capítulo) recortadas por la línea del doblez. Cada hoja es caja › recorte › contenido, y en cada cuadro **solo cambian transformaciones** (nada de `clip-path`): así va fluida a 120 Hz en el teléfono. Con una sola página, el reverso es papel liso.

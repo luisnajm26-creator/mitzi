@@ -23,6 +23,7 @@ En [Releases](https://github.com/luisnajm26-creator/mitzi/releases) están el in
 - **Gestos**: pellizcar para cambiar el tamaño de letra y deslizar por el borde izquierdo para el brillo.
 - **Tiempo que falta** del capítulo y del libro, ajustado a tu ritmo de lectura.
 - **Marcadores, subrayados y notas** en 5 colores, con panel de notas y exportación a Markdown.
+- **Compartir citas como imagen**: seleccionas un fragmento y Mitzi arma una tarjeta para historias o publicaciones, con 4 diseños y la letra con la que lees.
 - **Buscar dentro del libro**, y **definir o traducir** lo que seleccionas (en Android, con tus apps de diccionario y traducción).
 - **Tu lectura**: minutos por día, racha, la última semana, totales y una meta diaria. Todo queda en tu dispositivo.
 - **Lectura en voz alta** con las voces del sistema: resalta la oración que lee, pasa de página sola y tiene temporizador para dormir. En la PC también puede usar **voces naturales** de un servidor de voz local, como [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI).

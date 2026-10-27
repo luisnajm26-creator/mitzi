@@ -24,6 +24,8 @@ const api: MitziNativeApi = {
   keepAwake: on => ipcRenderer.invoke('power:keep-awake', on),
   installUpdate: info => ipcRenderer.invoke('update:install', info),
   onUpdateProgress: cb => listen<[number]>('update:progress', cb),
+  saveImage: (bytes, name) => ipcRenderer.invoke('image:save', bytes, name),
+  copyImage: bytes => ipcRenderer.invoke('image:copy', bytes),
 }
 
 contextBridge.exposeInMainWorld('mitziNative', api)

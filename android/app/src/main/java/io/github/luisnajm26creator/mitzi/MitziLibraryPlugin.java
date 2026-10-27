@@ -339,6 +339,39 @@ public class MitziLibraryPlugin extends Plugin {
             });
     }
 
+    /** Comparte una imagen (la tarjeta de una cita) con el menú de compartir del sistema. */
+    @PluginMethod
+    public void shareImage(PluginCall call) {
+        String data = call.getString("data");
+        String name = call.getString("name", "mitzi-cita.png").replaceAll("[^A-Za-z0-9._-]", "_");
+        if (data == null) {
+            call.reject("Falta la imagen");
+            return;
+        }
+        try {
+            File dir = new File(getContext().getCacheDir(), "compartir");
+            dir.mkdirs();
+            // solo la última: no se acumulan imágenes en la caché
+            File[] old = dir.listFiles();
+            if (old != null) for (File f : old) f.delete();
+            File file = new File(dir, name);
+            try (OutputStream out = new FileOutputStream(file)) {
+                out.write(android.util.Base64.decode(data, android.util.Base64.DEFAULT));
+            }
+            Uri uri = FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(Intent.ACTION_SEND);
+            intent.setType("image/png");
+            intent.putExtra(Intent.EXTRA_STREAM, uri);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent chooser = Intent.createChooser(intent, "Compartir cita");
+            chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            getActivity().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("No se pudo compartir: " + e.getMessage());
+        }
+    }
+
     // ---------- actualizaciones ----------
 
     /** Solo se descargan archivos de las versiones publicadas de este repositorio. */

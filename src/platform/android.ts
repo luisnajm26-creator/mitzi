@@ -13,6 +13,7 @@ interface MitziLibraryPlugin {
   openUrl(options: { url: string }): Promise<void>
   processText(options: { text: string }): Promise<{ handled: boolean }>
   haptic(): Promise<void>
+  shareImage(options: { data: string; name: string }): Promise<void>
   installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
   addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
@@ -76,6 +77,16 @@ export function createAndroidPlatform(): Platform {
     importDropped: async () => 0,
     openExternal: url => void Library.openUrl({ url }).catch(() => {}),
     haptic: () => void Library.haptic().catch(() => {}),
+    async shareImage(png, name) {
+      // el puente de Capacitor solo pasa texto: la imagen viaja en base64
+      const data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '')
+        reader.onerror = () => reject(reader.error)
+        reader.readAsDataURL(png)
+      })
+      await Library.shareImage({ data, name })
+    },
     lookupText: text =>
       Library.processText({ text })
         .then(r => r.handled)
