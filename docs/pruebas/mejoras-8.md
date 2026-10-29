@@ -26,3 +26,15 @@ El sonido al pasar página ahora es una grabación real de una hoja (tres varian
 | 11 | Apágalo | Las páginas giran en silencio |
 | 12 | En el teléfono (Mitzi Prueba), con el volumen de medios arriba | Igual que en la PC |
 | 13 | En **Acerca de › Créditos y licencias** | Aparece «Kenney · RPG Audio» (CC0) |
+
+## Galerías de ilustraciones
+
+Algunos libros juntan varias ilustraciones en un mismo capítulo (por ejemplo «Ilustraciones» al inicio de los volúmenes de Traducciones Ferindrad). Antes salían chiquitas arriba de cada página; ahora cada una se agranda como las láminas sueltas.
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 14 | En la PC, abre Re:Zero Vol 3 (Ferindrad) y ve a las ilustraciones del inicio | Cada ilustración horizontal ocupa las dos páginas, una por vuelta de hoja |
+| 15 | Pasa todas las ilustraciones | Después de la última sigue el libro, sin páginas en blanco de más |
+| 16 | Prueba también el Vol 6 (cinco ilustraciones) | Igual: cada una en su par de páginas |
+| 17 | En el teléfono, las mismas ilustraciones | Cada una llena el ancho de la pantalla, centrada, una por página |
+| 18 | Un capítulo normal con una ilustración suelta | Sigue igual que antes |
