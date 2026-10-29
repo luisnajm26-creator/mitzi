@@ -475,8 +475,28 @@ public class MitziLibraryPlugin extends Plugin {
             String status = headers.split("\r\n", 2)[0];
             if (status.contains(" 403")) throw new SecurityException("El código no coincide");
             if (!status.contains(" 200")) throw new Exception(status);
-            return new String(all, split + 4, all.length - split - 4, StandardCharsets.UTF_8);
+            byte[] reply = Arrays.copyOfRange(all, split + 4, all.length);
+            if (headers.toLowerCase(Locale.ROOT).contains("transfer-encoding: chunked")) reply = dechunk(reply);
+            return new String(reply, StandardCharsets.UTF_8);
         }
+    }
+
+    /** Une una respuesta «por partes»: cada parte viene precedida de su tamaño en hexadecimal. */
+    private static byte[] dechunk(byte[] raw) throws Exception {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        int i = 0;
+        while (i < raw.length) {
+            int lineEnd = i;
+            while (lineEnd + 1 < raw.length && !(raw[lineEnd] == '\r' && raw[lineEnd + 1] == '\n')) lineEnd++;
+            String sizeText = new String(raw, i, lineEnd - i, StandardCharsets.US_ASCII).split(";", 2)[0].trim();
+            int size = Integer.parseInt(sizeText, 16);
+            if (size == 0) break;
+            int start = lineEnd + 2;
+            if (start + size > raw.length) throw new Exception("respuesta incompleta");
+            out.write(raw, start, size);
+            i = start + size + 2;
+        }
+        return out.toByteArray();
     }
 
     // ---------- actualizaciones ----------

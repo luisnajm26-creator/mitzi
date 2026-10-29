@@ -59,7 +59,9 @@ export class SyncServer {
         this.pending.set(id, (ok, body) => {
           clearTimeout(timeout)
           if (ok) {
-            res.writeHead(200, { 'Content-Type': 'application/json', Connection: 'close' }).end(body)
+            // con el tamaño exacto: sin él, Node responde «por partes» (chunked) y el lector
+            // mínimo de Android recibía los tamaños de cada parte mezclados con los datos
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), Connection: 'close' }).end(body)
             return
           }
           res.writeHead(403, { Connection: 'close' }).end()
