@@ -98,6 +98,7 @@
 }
 
 .shelf-count {
+  white-space: nowrap;
   font-size: 13px;
   font-weight: 700;
   opacity: 0.7;
@@ -353,6 +354,13 @@
   }
   .brand {
     font-size: 18px;
+  }
+}
+
+/* teléfonos angostos: los botones ocupan todo; el contador cede su lugar */
+@media (max-width: 400px) {
+  .shelf-count {
+    display: none;
   }
 }
 

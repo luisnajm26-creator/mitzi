@@ -40,3 +40,5 @@ android/local.properties
 
 # Configuración local de herramientas
 .claude/
+docs/capturas/*.png
+!docs/capturas/social.png

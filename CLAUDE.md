@@ -27,6 +27,7 @@ Se hizo con ayuda de Claude: el autor define la idea, el diseño y las pruebas. 
 | `npm run publicar` | Instalador + APK firmado + `SHA256SUMS.txt`; con `-- --subir` crea el Release en GitHub. Las novedades van en `docs/versiones/x.y.z.md`. **Solo cuando el autor lo pide** (es público) |
 | `npm run demo` | Genera libros de prueba en `libros-prueba/demo` |
 | `npx electron scripts/generar-iconos.mjs` | Regenera los íconos PNG desde los SVG |
+| `npx electron scripts/capturas.mjs` | Capturas del README con los libros de `npm run demo` (con `npm run dev` abierto; `SOLO=pc` o `SOLO=telefono`). Se eligen a mano y se pasan a WebP en `docs/capturas/` |
 
 `postinstall` copia los recursos de pdf.js a `public/pdfjs/` y la letra de títulos a `public/fonts/` (ambas carpetas ignoradas por git).
 
