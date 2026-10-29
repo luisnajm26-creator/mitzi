@@ -55,7 +55,8 @@ src/
     layouts/          OpenBook (libro abierto: tapa, cantos, sombra del lomo)
     comfort/          temas, contraste automático, fuentes, ajustes, CSS que se inyecta al EPUB
     annotations/      subrayados, notas y marcadores
-    share/            tarjetas para compartir citas: designs.ts (colores y formatos), card.ts (dibujo en canvas), ShareSheet
+    share/            tarjetas para compartir: designs.ts (colores y formatos), card.ts (cita y piezas comunes: fondo,
+                      marca, letra), statsCard.ts (Mi semana / Mi mes), ShareShell (vista previa y botones), ShareSheet
     tts/              lectura en voz alta: backends.ts (sistema, Android y servidor de voz local), VoiceServer
   ui/                 Icon, Picker (selector propio, hoja desde abajo en el teléfono), controls (interruptores,
                       deslizadores; los usan el panel Aa y Configuración con los colores --r-*)

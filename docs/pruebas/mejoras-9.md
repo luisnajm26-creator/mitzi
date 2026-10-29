@@ -77,3 +77,20 @@ Los dos deben estar en la **misma red Wi-Fi**. Se sincroniza el avance, los subr
 | # | Haz esto | Debe pasar |
 |---|---|---|
 | 44 | Abre la página del repositorio en GitHub | Se ve el GIF del libro abierto con la hoja girando, y las secciones nuevas (Sincronizar, Colecciones) |
+
+## Compartir tu lectura
+
+En **Tu lectura** hay un botón **Compartir** (arriba, junto al título) que arma una tarjeta con tus números, igual que las citas.
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 45 | Tu lectura › **Compartir** | Se abre la vista previa de «Mi semana en Mitzi» con el total, las 7 barras y tus datos |
+| 46 | Cambia a **Mi mes** | La tarjeta muestra el mes con un calendario: los días que leíste más, más intensos |
+| 47 | Prueba los cuatro diseños y los dos formatos | Todo cabe: nada se encima con «Leído en Mitzi» abajo |
+| 48 | Con una meta diaria elegida, mira «Mi semana» | Una línea punteada marca la meta sobre las barras |
+| 49 | Revisa los datos | Solo salen los que tienen sentido: sin racha si es de un día, sin «0 libros terminados» |
+| 50 | En la historia, «Lo que más leí» | Aparece el libro con más tiempo; con **Mostrar la portada** encendido, también su portada |
+| 51 | En el teléfono (Mitzi Prueba), toca **Compartir** | Se abre el menú de compartir del sistema con la imagen |
+| 52 | En la PC, **Guardar imagen** y **Copiar** | Se guarda el PNG donde elijas; al copiar se puede pegar en WhatsApp o Discord |
+| 53 | Sin lectura en la semana | Avisa que la tarjeta saldrá en cero |
+| 54 | Comparte una **cita** desde un libro (como antes) | Sigue igual: mismos diseños, formatos y botones |

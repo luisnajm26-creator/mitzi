@@ -212,3 +212,29 @@
     flex: none;
   }
 }
+
+/* fuera del lector (Tu lectura) no hay tema: los colores de la app */
+.share-backdrop[data-app-colors='true'] {
+  --r-fg: var(--app-fg);
+  --r-bg: #15111f;
+  --r-surface: #1d1828;
+  --r-muted: rgba(243, 239, 248, 0.62);
+  --r-border: var(--glass-border);
+  --r-link: var(--accent);
+}
+
+/* el botón de cerrar usa el estilo del lector, que fuera de él no está cargado */
+.share-backdrop[data-app-colors='true'] .reader-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--r-fg);
+}
+
+.share-backdrop[data-app-colors='true'] .reader-icon:hover {
+  background: rgba(255, 255, 255, 0.09);
+}

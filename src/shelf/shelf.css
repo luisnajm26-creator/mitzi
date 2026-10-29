@@ -641,6 +641,13 @@
   }
 }
 
+.stats-share {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

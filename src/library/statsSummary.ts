@@ -20,6 +20,8 @@ export interface StatsSummary {
   /** libros terminados, el más reciente primero */
   finished: { book: BookRecord; at: number }[]
   started: number
+  /** todos los libros, por id */
+  books: Map<string, BookRecord>
 }
 
 export type Period = 'semana' | 'mes' | 'año'
@@ -32,6 +34,7 @@ export interface Bar {
   current: boolean
 }
 
+const MONTHS_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 const WEEKDAY = ['D', 'L', 'M', 'M', 'J', 'V', 'S']
 const WEEKDAY_LONG = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
@@ -74,6 +77,7 @@ export function summarize(rows: ReadingDay[], progress: ProgressRecord[], books:
     topBooks,
     finished,
     started: progress.filter(p => p.fraction > 0.005 && byId.has(p.bookId)).length,
+    books: byId,
   }
 }
 
@@ -159,3 +163,92 @@ export function favoriteTime(hours: number[]) {
 }
 
 export const monthName = (m: number) => MONTHS[m]
+
+/** Lo que va en la tarjeta para compartir: solo los números que lucen (sin racha de 1 día, sin «0 terminados»). */
+export interface ShareStats {
+  kind: 'semana' | 'mes'
+  /** «Mi semana en Mitzi» */
+  heading: string
+  /** «23 – 29 de octubre» u «octubre de 2026» */
+  range: string
+  totalMinutes: number
+  /** promedio por día en el periodo */
+  perDay: number
+  goal: number
+  /** semana: una barra por día */
+  bars: Bar[]
+  /** mes: un cuadro por día, empezando en lunes (null = hueco antes del día 1) */
+  calendar: ({ day: number; minutes: number; future: boolean } | null)[]
+  facts: { value: string; label: string }[]
+  topBook: { book: BookRecord; minutes: number } | null
+}
+
+export function shareStats(data: StatsSummary, kind: 'semana' | 'mes', goal: number): ShareStats {
+  const today = new Date()
+  let keys: string[] = []
+  let range = ''
+  let bars: Bar[] = []
+  const calendar: ShareStats['calendar'] = []
+  if (kind === 'semana') {
+    bars = periodBars(data.days, 'semana').bars
+    const from = new Date(today)
+    from.setDate(from.getDate() - 6)
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(from)
+      d.setDate(from.getDate() + i)
+      keys.push(dayKey(d))
+    }
+    range =
+      from.getMonth() === today.getMonth()
+        ? `${from.getDate()} – ${today.getDate()} de ${MONTHS_LONG[today.getMonth()]}`
+        : `${from.getDate()} de ${MONTHS_LONG[from.getMonth()]} – ${today.getDate()} de ${MONTHS_LONG[today.getMonth()]}`
+  } else {
+    // en los primeros días del mes todavía no hay mucho que mostrar: va el mes anterior
+    const month = today.getDate() <= 3 ? new Date(today.getFullYear(), today.getMonth() - 1, 1) : new Date(today.getFullYear(), today.getMonth(), 1)
+    const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+    for (let i = 0; i < (month.getDay() + 6) % 7; i++) calendar.push(null)
+    for (let n = 1; n <= days; n++) {
+      const d = new Date(month.getFullYear(), month.getMonth(), n)
+      keys.push(dayKey(d))
+      calendar.push({ day: n, minutes: minutesOn(data.days, d), future: d > today })
+    }
+    keys = keys.filter((_, i) => !calendar.filter(Boolean)[i]!.future)
+    range = `${MONTHS_LONG[month.getMonth()]} de ${month.getFullYear()}`
+  }
+  const rows = keys.map(k => data.days.get(k)).filter((r): r is ReadingDay => !!r)
+  const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0)
+  const pages = rows.reduce((s, r) => s + r.pages, 0)
+  const daysRead = rows.filter(r => r.minutes >= 1).length
+  const perBook = new Map<string, number>()
+  for (const r of rows) for (const [id, m] of Object.entries(r.byBook ?? {})) perBook.set(id, (perBook.get(id) ?? 0) + m)
+  const top = [...perBook].sort((a, b) => b[1] - a[1])[0]
+  const first = new Date(keys[0] + 'T00:00')
+  const finished = data.finished.filter(f => f.at >= first.getTime()).length
+
+  const facts: ShareStats['facts'] = []
+  facts.push({ value: `${daysRead} de ${keys.length}`, label: daysRead === 1 ? 'día leyendo' : 'días leyendo' })
+  if (data.streak >= 2) facts.push({ value: `${data.streak}`, label: 'días seguidos' })
+  if (pages >= 10) facts.push({ value: `${pages}`, label: 'páginas' })
+  if (finished > 0) facts.push({ value: `${finished}`, label: finished === 1 ? 'libro terminado' : 'libros terminados' })
+  const when = favoriteTime(sumHours(rows))
+  if (facts.length < 4 && when) facts.push({ value: when[0].toUpperCase() + when.slice(1), label: 'es cuando más leo' })
+
+  return {
+    kind,
+    heading: kind === 'semana' ? 'Mi semana en Mitzi' : 'Mi mes en Mitzi',
+    range,
+    totalMinutes,
+    perDay: keys.length ? totalMinutes / keys.length : 0,
+    goal,
+    bars,
+    calendar,
+    facts: facts.slice(0, 4),
+    topBook: top && top[1] >= 5 && data.books.get(top[0]) ? { book: data.books.get(top[0])!, minutes: top[1] } : null,
+  }
+}
+
+const sumHours = (rows: ReadingDay[]) => {
+  const hours = new Array(24).fill(0)
+  for (const r of rows) r.hours?.forEach((m, h) => (hours[h] += m))
+  return hours
+}

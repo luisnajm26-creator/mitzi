@@ -8,6 +8,7 @@ import { useReaderSettings } from '../reader/comfort/settings'
 import { Segment } from '../ui/controls'
 import { Icon } from '../ui/Icon'
 import { Picker } from '../ui/Picker'
+import { StatsShare } from './StatsShare'
 
 const GOALS = [0, 10, 15, 20, 30, 45, 60].map(m => ({ value: String(m), label: m ? `${m} min al día` : 'Sin meta' }))
 const PERIOD_NAME: Record<Period, string> = { semana: 'la semana pasada', mes: 'los 30 días anteriores', año: 'el año anterior' }
@@ -201,6 +202,7 @@ export function StatsPanel({ onClose }: { onClose(): void }) {
   useBackHandler(true, onClose)
   const [data, setData] = useState<StatsSummary | null>(null)
   const [period, setPeriod] = useState<Period>('semana')
+  const [sharing, setSharing] = useState(false)
   const goal = useReaderSettings(s => s.global.dailyGoal)
   const update = useReaderSettings(s => s.update)
 
@@ -224,6 +226,11 @@ export function StatsPanel({ onClose }: { onClose(): void }) {
       <div className="sheet stats" onClick={e => e.stopPropagation()} role="dialog" aria-label="Tu lectura">
         <header className="sheet-header settings-header">
           <h2>Tu lectura</h2>
+          {data && (
+            <button className="ghost-button small stats-share" onClick={() => setSharing(true)}>
+              <Icon name="share" size={16} /> Compartir
+            </button>
+          )}
           <button className="icon-button" onClick={onClose} aria-label="Cerrar">
             <Icon name="close" />
           </button>
@@ -357,6 +364,7 @@ export function StatsPanel({ onClose }: { onClose(): void }) {
         <div className="stats-goal-picker">
           <Picker label="Meta diaria" icon="check" value={String(goal)} options={GOALS} onChange={v => update({ dailyGoal: Number(v) })} />
         </div>
+        {sharing && data && <StatsShare data={data} onClose={() => setSharing(false)} />}
         <p className="sheet-note">
           Cuenta el tiempo que pasas leyendo (sin pausas largas). Se guarda solo en tus dispositivos; si sincronizas, se suma lo de
           cada uno. «Lo que más leíste» y «Cuándo lees» empiezan a contarse desde la versión 0.3.

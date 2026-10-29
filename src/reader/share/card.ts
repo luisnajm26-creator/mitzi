@@ -22,7 +22,7 @@ export const LONG_QUOTE_WORDS = 60
 const loaded = new Map<FontId, Promise<void>>()
 
 /** El canvas solo usa letras ya cargadas en la página (no las del iframe del libro). */
-function loadFont(id: FontId) {
+export function loadFont(id: FontId) {
   let p = loaded.get(id)
   if (!p) {
     const font = FONTS[id]
@@ -41,7 +41,7 @@ function loadFont(id: FontId) {
 }
 
 let icon: Promise<HTMLImageElement | null> | null = null
-function loadIcon() {
+export function loadIcon() {
   icon ??= new Promise(resolve => {
     const img = new Image()
     img.onload = () => resolve(img)
@@ -52,7 +52,7 @@ function loadIcon() {
 }
 
 /** Parte el texto en renglones que caben en `width` (respeta los saltos de párrafo). */
-function wrap(ctx: CanvasRenderingContext2D, text: string, width: number) {
+export function wrap(ctx: CanvasRenderingContext2D, text: string, width: number) {
   const lines: string[] = []
   for (const paragraph of text.split('\n')) {
     let line = ''
@@ -89,21 +89,8 @@ export function cleanQuote(text: string) {
   return quote
 }
 
-export async function renderCard(input: CardInput): Promise<HTMLCanvasElement> {
-  const fontId: FontId = input.fontId === 'publisher' ? 'literata' : input.fontId
-  await Promise.all([loadFont(fontId), document.fonts.load(`700 40px '${FONTS[fontId].family}'`).catch(() => {})])
-  const logo = await loadIcon()
-  const family = `'${FONTS[fontId].family}', ${FONTS[fontId].fallback}`
-
-  const { width: W, height: H } = FORMATS[input.format]
-  const story = input.format === 'historia'
-  const canvas = document.createElement('canvas')
-  canvas.width = W
-  canvas.height = H
-  const ctx = canvas.getContext('2d')!
-  const c = input.colors
-
-  // fondo con un degradado suave y una luz desde arriba
+/** Fondo de todas las tarjetas: degradado suave y una luz desde arriba. */
+export function paintBackground(ctx: CanvasRenderingContext2D, W: number, H: number, c: CardColors) {
   const bg = ctx.createLinearGradient(0, 0, 0, H)
   bg.addColorStop(0, c.bgTop)
   bg.addColorStop(1, c.bgBottom)
@@ -114,6 +101,40 @@ export async function renderCard(input: CardInput): Promise<HTMLCanvasElement> {
   glow.addColorStop(1, 'rgba(255, 255, 255, 0)')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, W, H)
+}
+
+/** Marca de Mitzi abajo, centrada en `y`: así quien vea la imagen sabe de dónde salió. */
+export function paintBrand(ctx: CanvasRenderingContext2D, W: number, y: number, family: string, c: CardColors, logo: HTMLImageElement | null) {
+  ctx.font = `600 30px ${family}`
+  const labelW = ctx.measureText(WATERMARK).width
+  const iconS = logo ? 52 : 0
+  const bx = (W - (iconS + (iconS ? 16 : 0) + labelW)) / 2
+  if (logo) ctx.drawImage(logo, bx, y - iconS / 2, iconS, iconS)
+  ctx.fillStyle = c.muted
+  ctx.textBaseline = 'middle'
+  ctx.fillText(WATERMARK, bx + iconS + (iconS ? 16 : 0), y + 1)
+}
+
+/** La letra elegida en el lector, ya cargada, como valor de `font-family` para el canvas. */
+export async function cardFamily(id: FontId) {
+  const fontId: FontId = id === 'publisher' ? 'literata' : id
+  await Promise.all([loadFont(fontId), document.fonts.load(`700 40px '${FONTS[fontId].family}'`).catch(() => {})])
+  return `'${FONTS[fontId].family}', ${FONTS[fontId].fallback}`
+}
+
+export async function renderCard(input: CardInput): Promise<HTMLCanvasElement> {
+  const family = await cardFamily(input.fontId)
+  const logo = await loadIcon()
+
+  const { width: W, height: H } = FORMATS[input.format]
+  const story = input.format === 'historia'
+  const canvas = document.createElement('canvas')
+  canvas.width = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')!
+  const c = input.colors
+
+  paintBackground(ctx, W, H, c)
 
   const pad = story ? 120 : 96
   const textW = W - pad * 2
@@ -199,17 +220,7 @@ export async function renderCard(input: CardInput): Promise<HTMLCanvasElement> {
     ctx.fillText(author, pad + infoX, infoY + titleH + 8)
   }
 
-  // marca de Mitzi abajo, centrada
-  ctx.font = `600 30px ${family}`
-  const label = WATERMARK
-  const labelW = ctx.measureText(label).width
-  const iconS = logo ? 52 : 0
-  const bx = (W - (iconS + (iconS ? 16 : 0) + labelW)) / 2
-  const by = H - pad - brandH / 2 - (story ? 20 : 0)
-  if (logo) ctx.drawImage(logo, bx, by - iconS / 2, iconS, iconS)
-  ctx.fillStyle = c.muted
-  ctx.textBaseline = 'middle'
-  ctx.fillText(label, bx + iconS + (iconS ? 16 : 0), by + 1)
+  paintBrand(ctx, W, H - pad - brandH / 2 - (story ? 20 : 0), family, c, logo)
 
   return canvas
 }
