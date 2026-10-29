@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import qrcode from 'qrcode-generator'
+import { useAppSettings } from '../app/settings'
 import { platform } from '../platform'
-import { formatCode, newCode } from '../sync/crypto'
-import { answerSync, describeResult, lastSync, parseManual, parseQr, qrText, SYNC_PORT, syncWith, type SyncTarget } from '../sync/session'
+import { syncNow, useSyncClient } from '../sync/auto'
+import { formatCode } from '../sync/crypto'
+import { beginPairing, endPairing, unlinkGuest, useSyncHost } from '../sync/host'
+import { useLinks } from '../sync/links'
+import { describeResult, pairWith, parseManual, parseQr, qrText, SYNC_PORT, type SyncTarget } from '../sync/session'
+import { Toggle } from '../ui/controls'
 import { Icon } from '../ui/Icon'
 
 /** El código QR dibujado como SVG (cuadritos negros sobre blanco, para que cualquier cámara lo lea). */
@@ -33,91 +38,100 @@ const ago = (at: number) => {
   return new Date(at).toLocaleDateString('es', { day: 'numeric', month: 'long' })
 }
 
-/** PC: abre el servidor y muestra el código hasta que el otro dispositivo se conecte. */
+/** La PC: sus equipos vinculados, el código para vincular otro y quedarse en la bandeja. */
 function HostCard() {
-  const [target, setTarget] = useState<SyncTarget | null>(null)
-  const [status, setStatus] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const code = useRef('')
-
-  useEffect(() => () => void platform.syncStop?.(), [])
-
-  const start = async () => {
-    setError(null)
-    setStatus(null)
-    code.current = newCode()
-    try {
-      const { hosts, port } = await platform.syncServe!(SYNC_PORT, async body => {
-        setStatus('Recibiendo…')
-        try {
-          const done = await answerSync(code.current, body)
-          setStatus(`Listo: sincronizado con ${done.name === 'PC' ? 'otra PC' : 'tu Android'}. ${describeResult(done.result)}`)
-          return done.reply
-        } catch (e) {
-          setStatus('Alguien intentó conectarse con un código equivocado.')
-          throw e
-        }
-      })
-      if (!hosts.length) throw new Error('Esta PC no está conectada a ninguna red')
-      setTarget({ hosts, port, code: code.current })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  const stop = () => {
-    void platform.syncStop?.()
-    setTarget(null)
-    setStatus(null)
-  }
-
-  if (!target)
-    return (
-      <section className="sync-card">
-        <h3>
-          <Icon name="wifi" size={18} /> Esperar en esta PC
-        </h3>
-        <p className="sheet-note">Muestra un código para que tu teléfono o tablet lo escanee. Los dos deben estar en la misma red Wi-Fi.</p>
-        <button className="read-button" onClick={start}>
-          Mostrar código
-        </button>
-        {error && <p className="sync-error">{error}</p>}
-      </section>
-    )
+  const guests = useLinks(s => s.guests)
+  const { listening, hosts, port, pairing, last, error } = useSyncHost()
+  const keepInTray = useAppSettings(s => s.keepInTray)
+  const setApp = useAppSettings(s => s.set)
+  const [asking, setAsking] = useState<string | null>(null)
 
   return (
     <section className="sync-card">
       <h3>
-        <Icon name="wifi" size={18} /> Esperando en esta PC
+        <Icon name="wifi" size={18} /> Esta PC
       </h3>
-      <div className="sync-host">
-        <QrCode text={qrText(target)} />
-        <div className="sync-manual">
-          <p className="sheet-note">En el otro dispositivo: Configuración › Sincronizar › Escanear código. O escribe:</p>
-          <dl>
-            <dt>Dirección</dt>
-            <dd>
-              <code>
-                {target.hosts[0]}
-                {target.port !== SYNC_PORT ? `:${target.port}` : ''}
-              </code>
-            </dd>
-            <dt>Código</dt>
-            <dd>
-              <code className="sync-code">{formatCode(target.code)}</code>
-            </dd>
-          </dl>
-          {target.hosts.length > 1 && <p className="sync-hint">Si no conecta, prueba con: {target.hosts.slice(1).join(' · ')}</p>}
+      {guests.length > 0 ? (
+        <>
+          <p className="sheet-note">
+            {listening
+              ? 'Atenta a tus equipos: se sincronizan solos al abrir Mitzi, al volver a ella y al cerrar un libro, si están en la misma red Wi-Fi.'
+              : 'Abriendo…'}
+          </p>
+          <ul className="folder-list sync-links">
+            {guests.map(g => (
+              <li key={g.id}>
+                <span className="collection-name">
+                  <strong>{g.label}</strong>
+                  <small>{g.lastSync ? `Sincronizado ${ago(g.lastSync)}` : 'Vinculado'}</small>
+                </span>
+                <button
+                  className="ghost-button small settings-danger"
+                  data-state={asking === g.id ? 'ask' : 'idle'}
+                  onClick={() => (asking === g.id ? unlinkGuest(g.id) : setAsking(g.id))}
+                  onBlur={() => setAsking(null)}
+                >
+                  {asking === g.id ? '¿Desvincular?' : 'Desvincular'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        !pairing && (
+          <p className="sheet-note">
+            Vincula tu teléfono o tablet una sola vez: desde ahí se sincronizan solos cuando estén en la misma red Wi-Fi y Mitzi esté
+            abierta en esta PC.
+          </p>
+        )
+      )}
+
+      {pairing ? (
+        <>
+          <div className="sync-host">
+            <QrCode text={qrText({ hosts, port, code: pairing.code })} />
+            <div className="sync-manual">
+              <p className="sheet-note">En el teléfono o la tablet: Configuración › Sincronizar › Escanear código. O escribe:</p>
+              <dl>
+                <dt>Dirección</dt>
+                <dd>
+                  <code>
+                    {hosts[0] ?? '—'}
+                    {port !== SYNC_PORT ? `:${port}` : ''}
+                  </code>
+                </dd>
+                <dt>Código</dt>
+                <dd>
+                  <code className="sync-code">{formatCode(pairing.code)}</code>
+                </dd>
+              </dl>
+              {hosts.length > 1 && <p className="sync-hint">Si no conecta, prueba con: {hosts.slice(1).join(' · ')}</p>}
+            </div>
+          </div>
+          <p className="sync-hint">
+            Solo se escanea una vez por equipo. El código deja de servir a los 10 minutos. Si Windows pregunta, permite que Mitzi use las
+            redes privadas; si tu Wi-Fi está como «red pública» en Windows, el teléfono no podrá conectarse.
+          </p>
+          <button className="ghost-button small" onClick={endPairing}>
+            Cancelar
+          </button>
+        </>
+      ) : (
+        <div className="settings-actions">
+          <button className="read-button" onClick={() => void beginPairing()}>
+            <Icon name="plus" size={18} /> Vincular un equipo
+          </button>
         </div>
-      </div>
-      {status && <p className="sync-status">{status}</p>}
-      <p className="sync-hint">
-        Si Windows pregunta, permite que Mitzi use las redes privadas. Si tu Wi-Fi está como «red pública» en Windows, el teléfono no
-        podrá conectarse. El código deja de servir al cerrar esta pantalla o a los 10 minutos.
-      </p>
-      <button className="ghost-button small" onClick={stop}>
-        Dejar de esperar
-      </button>
+      )}
+      {error && <p className="sync-error">{error}</p>}
+      {last && <p className={last.ok ? 'sync-status' : 'sync-error'}>{last.text}</p>}
+
+      <Toggle
+        label="Mantener Mitzi en la bandeja al cerrar"
+        hint="Al cerrar la ventana, Mitzi sigue junto al reloj y tus equipos se pueden sincronizar"
+        checked={keepInTray}
+        onChange={v => setApp({ keepInTray: v })}
+      />
     </section>
   )
 }
@@ -197,22 +211,26 @@ function Scanner({ onFound, onCancel }: { onFound(target: SyncTarget): void; onC
   )
 }
 
-/** Del lado que se conecta (teléfono, tablet u otra PC): escanear o escribir el código. */
+/** El teléfono o la tablet: vincularse con la PC (escaneando o escribiendo el código) o, si ya está, su estado. */
 function JoinCard() {
+  const host = useLinks(s => s.host)
+  const setHost = useLinks(s => s.setHost)
+  const { busy, last } = useSyncClient()
   const [mode, setMode] = useState<'idle' | 'scan' | 'type'>('idle')
   const [address, setAddress] = useState('')
   const [code, setCode] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [pairing, setPairing] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+  const [asking, setAsking] = useState(false)
   const canScan = !!navigator.mediaDevices?.getUserMedia
 
   const run = async (target: SyncTarget) => {
     setMode('idle')
-    setBusy(true)
-    setStatus({ ok: true, text: 'Sincronizando…' })
+    setPairing(true)
+    setStatus({ ok: true, text: 'Vinculando…' })
     try {
-      const done = await syncWith(target)
-      setStatus({ ok: true, text: `Listo: sincronizado con tu ${done.name}. ${describeResult(done.result)}` })
+      const done = await pairWith(target)
+      setStatus({ ok: true, text: `Listo: vinculado con ${done.label}. ${describeResult(done.result)}` })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       setStatus({
@@ -222,7 +240,7 @@ function JoinCard() {
           : `No se pudo conectar con la PC (${message}). ¿Están en la misma red Wi-Fi y la PC muestra el código?`,
       })
     } finally {
-      setBusy(false)
+      setPairing(false)
     }
   }
   const found = useRef(run)
@@ -230,12 +248,49 @@ function JoinCard() {
   const onFound = useMemo(() => (t: SyncTarget) => void found.current(t), [])
   const manual = parseManual(address, code)
 
+  if (host)
+    return (
+      <section className="sync-card">
+        <h3>
+          <Icon name="sync" size={18} /> Vinculado con {host.label}
+        </h3>
+        <p className="sheet-note">
+          Se sincroniza solo al abrir Mitzi, al volver a ella y al cerrar un libro, cuando los dos están en la misma red Wi-Fi y Mitzi
+          está abierta en la PC.
+        </p>
+        {host.lastSync && <p className="sync-hint">Última vez: {ago(host.lastSync)}.</p>}
+        {(status ?? last) && <p className={(status ?? last)!.ok ? 'sync-status' : 'sync-error'}>{(status ?? last)!.text}</p>}
+        <div className="settings-actions">
+          <button
+            className="read-button"
+            disabled={busy}
+            onClick={() => {
+              setStatus(null)
+              void syncNow('manual').catch(() => {})
+            }}
+          >
+            <Icon name="sync" size={18} /> {busy ? 'Sincronizando…' : 'Sincronizar ahora'}
+          </button>
+          <button
+            className="ghost-button small settings-danger"
+            data-state={asking ? 'ask' : 'idle'}
+            onClick={() => (asking ? setHost(null) : setAsking(true))}
+            onBlur={() => setAsking(false)}
+          >
+            {asking ? '¿Desvincular?' : 'Desvincular'}
+          </button>
+        </div>
+      </section>
+    )
+
   return (
     <section className="sync-card">
       <h3>
-        <Icon name="sync" size={18} /> Conectar con una PC
+        <Icon name="sync" size={18} /> Vincular con una PC
       </h3>
-      <p className="sheet-note">En la PC abre Configuración › Sincronizar › Mostrar código.</p>
+      <p className="sheet-note">
+        Una sola vez: en la PC abre Configuración › Sincronizar › Vincular un equipo, y escanea el código. Después se sincronizan solos.
+      </p>
       {mode === 'scan' && <Scanner onFound={onFound} onCancel={() => setMode('idle')} />}
       {mode === 'type' && (
         <form
@@ -253,19 +308,19 @@ function JoinCard() {
             Código
             <input value={code} onChange={e => setCode(e.target.value)} placeholder="K7QM-3XPA" autoCapitalize="characters" spellCheck={false} />
           </label>
-          <button className="read-button small" type="submit" disabled={!manual || busy}>
-            Sincronizar
+          <button className="read-button small" type="submit" disabled={!manual || pairing}>
+            Vincular
           </button>
         </form>
       )}
       {mode === 'idle' && (
         <div className="settings-actions">
           {canScan && (
-            <button className="read-button" onClick={() => setMode('scan')} disabled={busy}>
+            <button className="read-button" onClick={() => setMode('scan')} disabled={pairing}>
               <Icon name="camera" size={18} /> Escanear código
             </button>
           )}
-          <button className="ghost-button" onClick={() => setMode('type')} disabled={busy}>
+          <button className="ghost-button" onClick={() => setMode('type')} disabled={pairing}>
             Escribir el código
           </button>
         </div>
@@ -275,24 +330,30 @@ function JoinCard() {
   )
 }
 
-/** En Configuración: sincronizar con otro dispositivo de la misma red Wi-Fi. */
+/** En Configuración: vincular equipos y ver cómo va la sincronización. */
 export function SyncContent() {
-  const last = lastSync()
+  const guests = useLinks(s => s.guests.length)
   return (
     <div className="sync">
       <p className="sheet-note">
-        Pasa tu avance, subrayados, notas, marcadores, colecciones y estadísticas entre tus equipos, directo por tu Wi-Fi: sin
-        cuentas ni internet, y cifrado con el código de la PC. Los libros no se copian; cada uno se reconoce aunque esté en otra
-        carpeta.
+        Pasa tu avance, subrayados, notas, marcadores, colecciones y estadísticas entre tus equipos, directo por tu Wi-Fi: sin cuentas
+        ni internet, y cifrado. La PC es el centro: el teléfono y la tablet se ponen al día a través de ella. Los libros no se copian;
+        cada uno se reconoce aunque esté en otra carpeta.
       </p>
       {platform.syncServe && <HostCard />}
-      {platform.syncRequest && <JoinCard />}
+      {/* en la PC también se puede vincular con otra PC, pero casi nunca hace falta: va plegado */}
+      {platform.syncRequest &&
+        (platform.syncServe ? (
+          !guests && (
+            <details className="about-credits">
+              <summary>¿Esta PC con otra PC?</summary>
+              <JoinCard />
+            </details>
+          )
+        ) : (
+          <JoinCard />
+        ))}
       {!platform.syncServe && !platform.syncRequest && <p className="sheet-note">En el navegador no se puede sincronizar.</p>}
-      {last && (
-        <p className="sync-hint">
-          Última vez: {ago(last.at)}, con {last.name === 'PC' ? 'una PC' : 'un Android'}.
-        </p>
-      )}
     </div>
   )
 }

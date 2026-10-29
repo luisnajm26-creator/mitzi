@@ -14,6 +14,8 @@ export interface AppSettings {
   batterySaver: boolean
   /** buscar una versión nueva una vez al día */
   autoUpdates: boolean
+  /** (PC) al cerrar la ventana, Mitzi queda en la bandeja y sigue atendiendo a los equipos vinculados */
+  keepInTray: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -21,6 +23,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   shelfDust: true,
   batterySaver: false,
   autoUpdates: true,
+  keepInTray: false,
 }
 
 interface AppSettingsState extends AppSettings {

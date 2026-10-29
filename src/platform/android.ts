@@ -17,6 +17,8 @@ interface MitziLibraryPlugin {
   shareImage(options: { data: string; name: string }): Promise<void>
   installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
   syncRequest(options: { hosts: string[]; port: number; body: string }): Promise<{ body: string }>
+  syncDiscover(options: { port: number }): Promise<{ peers: { host: string; port: number; id: string }[] }>
+  deviceLabel(): Promise<{ label: string }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
   addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
 }
@@ -140,6 +142,8 @@ export function createAndroidPlatform(): Platform {
     setHighRefresh: on => Library.setHighRefresh({ on }).catch(() => {}),
     // por el plugin: la página no puede pedir http a la red local (Android lo bloquea)
     syncRequest: async (hosts, port, body) => (await Library.syncRequest({ hosts, port, body })).body,
+    syncDiscover: async () => (await Library.syncDiscover({ port: 47123 })).peers,
+    deviceLabel: async () => (await Library.deviceLabel()).label,
     onBackButton: cb => listen(() => App.addListener('backButton', cb)),
     exitApp: () => App.exitApp(),
   }

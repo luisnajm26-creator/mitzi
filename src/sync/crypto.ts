@@ -58,20 +58,46 @@ function fromBase64(text: string) {
 /** `kind` va dentro de lo cifrado: una respuesta no se puede reenviar como si fuera un pedido. */
 type Kind = 'pedido' | 'respuesta'
 
-export async function seal(code: string, kind: Kind, data: unknown) {
-  const iv = crypto.getRandomValues(new Uint8Array(12))
-  const plain = new TextEncoder().encode(JSON.stringify(data))
-  const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(kind) }, await keyOf(code), plain)
-  return JSON.stringify({ v: 1, iv: toBase64(iv), data: toBase64(new Uint8Array(sealed)) })
+/**
+ * Con qué se cifra: el código corto que muestra la PC (solo para vincular un equipo) o la llave
+ * larga que se intercambian al vincularse (todas las veces siguientes, sin código).
+ */
+export type Secret = { code: string } | { key: string; from: string }
+
+/** Llave nueva de un vínculo: 32 bytes al azar, en base64. */
+export const newKey = () => toBase64(crypto.getRandomValues(new Uint8Array(32)))
+
+const rawKeys = new Map<string, Promise<CryptoKey>>()
+const keyOfRaw = (key: string) => {
+  if (!rawKeys.has(key)) rawKeys.set(key, crypto.subtle.importKey('raw', fromBase64(key), 'AES-GCM', false, ['encrypt', 'decrypt']))
+  return rawKeys.get(key)!
 }
 
-/** Lanza un error si el código no es el correcto (o alguien cambió los datos). */
-export async function open<T>(code: string, kind: Kind, body: string): Promise<T> {
-  const envelope = JSON.parse(body) as { v: number; iv: string; data: string }
-  if (envelope.v !== 1) throw new Error('Versión de sincronización distinta: actualiza Mitzi en los dos equipos')
+const cryptoKey = (secret: Secret) => ('code' in secret ? keyOf(secret.code) : keyOfRaw(secret.key))
+
+export async function seal(secret: Secret, kind: Kind, data: unknown) {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const plain = new TextEncoder().encode(JSON.stringify(data))
+  const sealed = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(kind) }, await cryptoKey(secret), plain)
+  // v1: con el código; v2: con la llave del vínculo, y dice de quién viene para buscar su llave
+  const head = 'code' in secret ? { v: 1 } : { v: 2, from: secret.from }
+  return JSON.stringify({ ...head, iv: toBase64(iv), data: toBase64(new Uint8Array(sealed)) })
+}
+
+/** Qué clase de sobre es (sin abrirlo): para saber con qué llave abrirlo. */
+export function peek(body: string): { v: number; from?: string } {
+  const envelope = JSON.parse(body) as { v: number; from?: string }
+  if (envelope.v !== 1 && envelope.v !== 2) throw new Error('Versión de sincronización distinta: actualiza Mitzi en los dos equipos')
+  return envelope
+}
+
+/** Lanza un error si la llave no es la correcta (o alguien cambió los datos). */
+export async function open<T>(secret: Secret, kind: Kind, body: string): Promise<T> {
+  peek(body)
+  const envelope = JSON.parse(body) as { iv: string; data: string }
   const plain = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: fromBase64(envelope.iv), additionalData: new TextEncoder().encode(kind) },
-    await keyOf(code),
+    await cryptoKey(secret),
     fromBase64(envelope.data),
   )
   return JSON.parse(new TextDecoder().decode(plain)) as T

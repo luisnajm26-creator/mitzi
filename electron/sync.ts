@@ -1,17 +1,18 @@
+import dgram from 'node:dgram'
 import http from 'node:http'
 import os from 'node:os'
 
 /**
- * Servidor de la sincronización por Wi-Fi: solo está abierto mientras la pantalla
- * «Sincronizar» muestra el código. Lo que llega va cifrado; la ventana lo abre, lo une con su
- * base de datos y devuelve la respuesta (aquí no se lee nada).
+ * Servidor de la sincronización por Wi-Fi: abierto mientras haya equipos vinculados (o se esté
+ * vinculando uno). Lo que llega va cifrado; la ventana lo abre, lo une con su base de datos y
+ * devuelve la respuesta (aquí no se lee nada). Cuándo dejar de aceptar el código para vincular
+ * lo decide la ventana.
+ * También responde por UDP a «¿dónde estás?»: si la PC cambió de dirección, el teléfono la encuentra.
  */
 const PATH = '/mitzi-sync'
 const MAX_BODY = 64 * 1024 * 1024
-/** Después de tantos intentos con un código equivocado se cierra: nadie puede probar códigos al azar. */
-const MAX_FAILURES = 5
-/** Si nadie se conecta, se cierra solo. */
-const OPEN_FOR_MS = 10 * 60_000
+const ASK = 'MITZI?'
+const ANSWER = 'MITZI!'
 
 type Reply = (ok: boolean, body: string) => void
 
@@ -34,13 +35,20 @@ export class SyncServer {
   private server: http.Server | null = null
   private pending = new Map<number, Reply>()
   private nextId = 1
-  private failures = 0
-  private closeTimer: NodeJS.Timeout | undefined
+  private finder: dgram.Socket | null = null
+  private current: { hosts: string[]; port: number } | null = null
 
-  /** `onRequest` le pasa el pedido a la ventana; la respuesta vuelve por `reply()`. */
-  async start(preferredPort: number, onRequest: (id: number, body: string) => void) {
-    await this.stop()
-    this.failures = 0
+  get running() {
+    return !!this.server
+  }
+
+  /**
+   * `onRequest` le pasa el pedido a la ventana; la respuesta vuelve por `reply()`. Si ya estaba
+   * abierto, solo se cambia a quién se le pasan los pedidos (la ventana se recargó).
+   */
+  async start(preferredPort: number, me: { id: string; label: string }, onRequest: (id: number, body: string) => void) {
+    this.onRequest = onRequest
+    if (this.server && this.current) return { ...this.current, hosts: localAddresses() }
     const server = http.createServer((req, res) => {
       if (req.method !== 'POST' || req.url !== PATH) {
         res.writeHead(404).end()
@@ -65,9 +73,8 @@ export class SyncServer {
             return
           }
           res.writeHead(403, { Connection: 'close' }).end()
-          if (++this.failures >= MAX_FAILURES) void this.stop()
         })
-        onRequest(id, Buffer.concat(chunks).toString('utf8'))
+        this.onRequest?.(id, Buffer.concat(chunks).toString('utf8'))
       })
     })
     const port = await new Promise<number>((resolve, reject) => {
@@ -82,8 +89,24 @@ export class SyncServer {
       listen(preferredPort)
     })
     this.server = server
-    this.closeTimer = setTimeout(() => void this.stop(), OPEN_FOR_MS)
-    return { hosts: localAddresses(), port }
+    this.current = { hosts: localAddresses(), port }
+    this.listenForSearches(port, me)
+    return this.current
+  }
+
+  private onRequest: ((id: number, body: string) => void) | null = null
+
+  /** Responde a quien pregunte en la red por una PC con Mitzi (solo dice su id y su puerto). */
+  private listenForSearches(port: number, me: { id: string; label: string }) {
+    const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+    socket.on('message', (msg, from) => {
+      if (msg.toString('utf8') !== ASK) return
+      socket.send(`${ANSWER}${JSON.stringify({ id: me.id, port })}`, from.port, from.address)
+    })
+    // si no se puede (puerto ocupado, sin red), se sigue sin búsqueda: las direcciones guardadas bastan
+    socket.on('error', () => socket.close())
+    socket.bind(port)
+    this.finder = socket
   }
 
   reply(id: number, ok: boolean, body: string) {
@@ -94,8 +117,15 @@ export class SyncServer {
   }
 
   async stop() {
-    clearTimeout(this.closeTimer)
     for (const id of [...this.pending.keys()]) this.reply(id, false, 'cerrado')
+    try {
+      this.finder?.close()
+    } catch {
+      // ya estaba cerrado
+    }
+    this.finder = null
+    this.current = null
+    this.onRequest = null
     const server = this.server
     this.server = null
     if (server) await new Promise<void>(resolve => server.close(() => resolve()))
@@ -132,4 +162,31 @@ export async function syncRequest(hosts: string[], port: number, body: string) {
     }
   }
   throw lastError
+}
+
+/** Pregunta en la red qué PC con Mitzi está esperando (PC con PC; el teléfono lo hace en Java). */
+export function discover(port: number, waitMs = 1500) {
+  return new Promise<{ host: string; port: number; id: string }[]>(resolve => {
+    const found: { host: string; port: number; id: string }[] = []
+    const socket = dgram.createSocket('udp4')
+    socket.on('message', (msg, from) => {
+      const text = msg.toString('utf8')
+      if (!text.startsWith(ANSWER)) return
+      try {
+        const info = JSON.parse(text.slice(ANSWER.length)) as { id: string; port: number }
+        if (!found.some(f => f.host === from.address)) found.push({ host: from.address, port: info.port, id: info.id })
+      } catch {
+        // respuesta rara: se ignora
+      }
+    })
+    socket.on('error', () => resolve(found))
+    socket.bind(() => {
+      socket.setBroadcast(true)
+      socket.send(ASK, port, '255.255.255.255')
+    })
+    setTimeout(() => {
+      socket.close()
+      resolve(found)
+    }, waitMs)
+  })
 }

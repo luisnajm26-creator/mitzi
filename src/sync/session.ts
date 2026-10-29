@@ -1,12 +1,15 @@
 import { platform } from '../platform'
 import { refreshLibrary } from '../library/store'
-import { cleanCode, open, seal } from './crypto'
+import { cleanCode, newKey, open, peek, seal } from './crypto'
+import { deviceId, deviceLabel } from './device'
+import { useLinks } from './links'
 import { mergeSnapshot, takeSnapshot, type MergeResult, type Snapshot } from './snapshot'
 
 /**
- * Sincronizar por Wi-Fi, sin cuentas ni internet: la PC espera con un código en pantalla y el
- * otro dispositivo (que lo escanea o lo escribe) le manda sus datos cifrados. La PC une lo que
- * llegó con lo suyo y responde con el resultado, que el otro también une: los dos quedan iguales.
+ * Sincronizar por Wi-Fi, sin cuentas ni internet. La primera vez el teléfono se vincula con el
+ * código que muestra la PC; después se sincroniza solo, cifrando con la llave del vínculo.
+ * Cada vez manda sus datos, la PC los une con los suyos y responde con todo junto, que el
+ * teléfono también une: los dos quedan iguales.
  */
 export const SYNC_PORT = 47123
 
@@ -18,8 +21,10 @@ export interface SyncTarget {
 }
 
 export interface SyncOutcome {
-  /** con quién se sincronizó («PC», «Android») */
+  /** qué es el otro equipo («PC», «Android») */
   name: string
+  /** cómo se llama («Pura 70 Ultra», «DESKTOP-LUIS») */
+  label: string
   result: MergeResult
 }
 
@@ -40,52 +45,97 @@ export function parseManual(address: string, code: string): SyncTarget | null {
   return { hosts: [m[1]], port: m[2] ? Number(m[2]) : SYNC_PORT, code: clean }
 }
 
-const LAST = 'mitzi-sync-ultima'
-
-export function lastSync(): { at: number; name: string } | null {
-  try {
-    return JSON.parse(localStorage.getItem(LAST) ?? 'null')
-  } catch {
-    return null
-  }
+/** Lo que viaja: los datos y, al vincular, quién es cada uno (y la llave nueva, de vuelta). */
+interface SyncRequest {
+  snapshot: Snapshot
+  link?: { id: string; label: string }
 }
 
-function saveLast(name: string) {
-  try {
-    localStorage.setItem(LAST, JSON.stringify({ at: Date.now(), name }))
-  } catch {
-    // no es grave
-  }
+interface SyncResponse {
+  snapshot: Snapshot
+  link?: { id: string; label: string; key: string }
 }
 
-/** Del lado que escanea: manda lo suyo y une lo que responde la PC. */
-export async function syncWith(target: SyncTarget): Promise<SyncOutcome> {
+/** Después de unir: la biblioteca se actualiza y el lector se entera (por si su libro avanzó en otro lado). */
+async function afterMerge(result: MergeResult) {
+  await refreshLibrary()
+  window.dispatchEvent(new CustomEvent('mitzi:sincronizado', { detail: result }))
+}
+
+/** El código no coincide o la PC ya no tiene este vínculo. */
+export const isRejected = (e: unknown) => e instanceof Error && /coincide/.test(e.message)
+
+/**
+ * Del lado del teléfono: se vincula con la PC usando su código (una sola vez) y de paso se
+ * sincroniza. La PC responde con la llave del vínculo, que se usa desde entonces.
+ */
+export async function pairWith(target: SyncTarget): Promise<SyncOutcome> {
   if (!platform.syncRequest) throw new Error('Este dispositivo no puede sincronizar')
-  const body = await seal(target.code, 'pedido', await takeSnapshot())
-  const reply = await platform.syncRequest(target.hosts, target.port, body)
-  let remote: Snapshot
+  const secret = { code: target.code }
+  const request: SyncRequest = { snapshot: await takeSnapshot(), link: { id: deviceId(), label: await deviceLabel() } }
+  const reply = await platform.syncRequest(target.hosts, target.port, await seal(secret, 'pedido', request))
+  let response: SyncResponse
   try {
-    remote = await open<Snapshot>(target.code, 'respuesta', reply)
+    response = await open<SyncResponse>(secret, 'respuesta', reply)
   } catch {
     throw new Error('La respuesta no se pudo leer. Revisa el código.')
   }
-  const result = await mergeSnapshot(remote)
-  await refreshLibrary()
-  saveLast(remote.name)
-  return { name: remote.name, result }
+  if (response.link) {
+    const now = Date.now()
+    useLinks.getState().setHost({ ...response.link, linkedAt: now, lastSync: now, hosts: target.hosts, port: target.port })
+  }
+  const result = await mergeSnapshot(response.snapshot)
+  await afterMerge(result)
+  return { name: response.snapshot.name, label: response.link?.label ?? response.snapshot.name, result }
+}
+
+/** Del lado del teléfono, ya vinculado: sin código, con la llave del vínculo. */
+export async function syncLinked(hosts: string[], port: number): Promise<SyncOutcome> {
+  const host = useLinks.getState().host
+  if (!host || !platform.syncRequest) throw new Error('No hay una PC vinculada')
+  const secret = { key: host.key, from: deviceId() }
+  const request: SyncRequest = { snapshot: await takeSnapshot(), link: { id: deviceId(), label: await deviceLabel() } }
+  const reply = await platform.syncRequest(hosts, port, await seal(secret, 'pedido', request))
+  const response = await open<SyncResponse>(secret, 'respuesta', reply)
+  const result = await mergeSnapshot(response.snapshot)
+  useLinks.getState().touch(host.id, { hosts, port })
+  await afterMerge(result)
+  return { name: response.snapshot.name, label: host.label, result }
 }
 
 /**
- * Del lado de la PC: abre lo que llegó (si el código no coincide, lanza un error y no se toca
- * nada), lo une con lo de aquí y responde con todo junto.
+ * Del lado de la PC: abre lo que llegó y lo une con lo de aquí. Con el código (`pairingCode`,
+ * solo mientras se muestra) vincula al equipo; si viene con la llave de un vínculo, lo reconoce.
+ * Si no es ninguno de los dos, lanza un error y no se toca nada.
  */
-export async function answerSync(code: string, body: string): Promise<{ reply: string } & SyncOutcome> {
-  const remote = await open<Snapshot>(code, 'pedido', body)
-  const result = await mergeSnapshot(remote)
-  const reply = await seal(code, 'respuesta', await takeSnapshot())
-  await refreshLibrary()
-  saveLast(remote.name)
-  return { reply, name: remote.name, result }
+export async function answerSync(body: string, pairingCode: string | null): Promise<{ reply: string; paired: boolean } & SyncOutcome> {
+  const envelope = peek(body)
+  const links = useLinks.getState()
+  if (envelope.v === 1) {
+    if (!pairingCode) throw new Error('No se está vinculando ningún equipo')
+    const secret = { code: pairingCode }
+    const request = await open<SyncRequest>(secret, 'pedido', body)
+    const now = Date.now()
+    const key = newKey()
+    if (request.link) links.saveGuest({ id: request.link.id, label: request.link.label, key, linkedAt: now, lastSync: now })
+    const result = await mergeSnapshot(request.snapshot)
+    const response: SyncResponse = {
+      snapshot: await takeSnapshot(),
+      link: request.link && { id: deviceId(), label: await deviceLabel(), key },
+    }
+    const reply = await seal(secret, 'respuesta', response)
+    await afterMerge(result)
+    return { reply, paired: !!request.link, name: request.snapshot.name, label: request.link?.label ?? request.snapshot.name, result }
+  }
+  const guest = links.guests.find(g => g.id === envelope.from)
+  if (!guest) throw new Error('Equipo no vinculado')
+  const request = await open<SyncRequest>({ key: guest.key, from: guest.id }, 'pedido', body)
+  const result = await mergeSnapshot(request.snapshot)
+  const response: SyncResponse = { snapshot: await takeSnapshot() }
+  const reply = await seal({ key: guest.key, from: deviceId() }, 'respuesta', response)
+  links.touch(guest.id, request.link ? { label: request.link.label } : {})
+  await afterMerge(result)
+  return { reply, paired: false, name: request.snapshot.name, label: request.link?.label ?? guest.label, result }
 }
 
 /** «3 avances, 5 notas y 2 días de lectura» */
@@ -99,5 +149,7 @@ export function describeResult(r: MergeResult) {
   add(r.days, 'día de lectura', 'días de lectura')
   if (!parts.length) return 'Ya estaban iguales.'
   const last = parts.pop()!
-  return `Llegaron ${parts.length ? `${parts.join(', ')} y ${last}` : last}.`
+  // «Llegó 1 avance», «Llegaron 2 avances», «Llegaron 1 avance y 3 notas»
+  const verb = !parts.length && last.startsWith('1 ') ? 'Llegó' : 'Llegaron'
+  return `${verb} ${parts.length ? `${parts.join(', ')} y ${last}` : last}.`
 }

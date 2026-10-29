@@ -1,10 +1,11 @@
-import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, net, powerSaveBlocker, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, ipcMain, Menu, nativeImage, net, powerSaveBlocker, protocol, shell, Tray } from 'electron'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { LibraryService } from './library.js'
 import { installUpdate } from './updater.js'
-import { SyncServer, syncRequest } from './sync.js'
+import os from 'node:os'
+import { discover, SyncServer, syncRequest } from './sync.js'
 import type { UpdateInfo } from '../shared/native-api.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -34,6 +35,44 @@ if (!app.requestSingleInstanceLock()) app.quit()
 let win: BrowserWindow | null = null
 let wakeLockId: number | null = null
 const syncServer = new SyncServer()
+let tray: Tray | null = null
+/** Al cerrar la ventana, Mitzi queda en la bandeja (así sigue atendiendo a los equipos vinculados). */
+let keepInTray = false
+let quitting = false
+
+function showWindow() {
+  if (!win) return createWindow()
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+
+function setTray(on: boolean) {
+  keepInTray = on
+  if (on && !tray) {
+    const icon = nativeImage.createFromPath(path.join(appRoot, 'resources', 'icon.png')).resize({ width: 16, height: 16 })
+    tray = new Tray(icon)
+    tray.setToolTip('Mitzi')
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: 'Abrir Mitzi', click: showWindow },
+        { type: 'separator' },
+        {
+          label: 'Salir',
+          click: () => {
+            quitting = true
+            app.quit()
+          },
+        },
+      ]),
+    )
+    tray.on('click', showWindow)
+  }
+  if (!on && tray) {
+    tray.destroy()
+    tray = null
+  }
+}
 
 const library = new LibraryService(
   path.join(app.getPath('userData'), 'biblioteca.json'),
@@ -63,6 +102,12 @@ function createWindow() {
   win.on('enter-full-screen', () => win?.webContents.send('window:fullscreen-changed', true))
   win.on('leave-full-screen', () => win?.webContents.send('window:fullscreen-changed', false))
   win.on('closed', () => (win = null))
+  win.on('close', event => {
+    if (!keepInTray || quitting) return
+    // se esconde en vez de cerrarse: la página sigue viva y sigue sincronizando
+    event.preventDefault()
+    win?.hide()
+  })
 
   // Los enlaces externos (de los libros o de «Acerca de») se abren en el navegador o en
   // la app de correo, nunca dentro de Mitzi.
@@ -115,10 +160,15 @@ function registerIpc() {
   // Electron 44 usa el portapapeles al estilo web (ClipboardItem con un Blob)
   ipcMain.handle('image:copy', (_e, bytes: Uint8Array) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(bytes)], { type: 'image/png' }) })]))
   // sincronizar por Wi-Fi: el servidor solo vive mientras la pantalla muestra el código
-  ipcMain.handle('sync:start', (e, port: number) => syncServer.start(port, (id, body) => e.sender.send('sync:incoming', id, body)))
+  ipcMain.handle('sync:start', (e, port: number, me: { id: string; label: string }) =>
+    syncServer.start(port, me, (id, body) => e.sender.send('sync:incoming', id, body)),
+  )
   ipcMain.handle('sync:reply', (_e, id: number, ok: boolean, body: string) => syncServer.reply(id, ok, body))
   ipcMain.handle('sync:stop', () => syncServer.stop())
   ipcMain.handle('sync:request', (_e, hosts: string[], port: number, body: string) => syncRequest(hosts, port, body))
+  ipcMain.handle('sync:discover', (_e, port: number) => discover(port))
+  ipcMain.handle('app:label', () => os.hostname())
+  ipcMain.handle('app:tray', (_e, on: boolean) => setTray(on))
   ipcMain.handle('power:keep-awake', (_e, on: boolean) => {
     if (on && wakeLockId === null) wakeLockId = powerSaveBlocker.start('prevent-display-sleep')
     if (!on && wakeLockId !== null) {
@@ -148,11 +198,9 @@ app.whenReady().then(async () => {
   createWindow()
 })
 
-app.on('second-instance', () => {
-  if (!win) return
-  if (win.isMinimized()) win.restore()
-  win.focus()
-})
+app.on('second-instance', () => showWindow())
+
+app.on('before-quit', () => (quitting = true))
 
 app.on('window-all-closed', () => {
   library.dispose()

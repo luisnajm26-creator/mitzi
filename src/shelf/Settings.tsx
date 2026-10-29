@@ -16,6 +16,7 @@ import { AboutContent, UpdateCheck } from './About'
 import { CollectionsContent } from './Collections'
 import { FoldersContent, useFolders } from './Folders'
 import { SyncContent } from './SyncPanel'
+import { useLinks } from '../sync/links'
 
 export type SettingsPage = 'inicio' | 'carpetas' | 'colecciones' | 'sincronizar' | 'acerca'
 
@@ -75,6 +76,13 @@ function Home({ go }: { go(page: SettingsPage): void }) {
   const scanning = useLibrary(s => s.scanning)
   const count = useLibrary(s => s.books.length)
   const folderCount = folders?.folders.length ?? 0
+  const linkedHost = useLinks(s => s.host)
+  const guests = useLinks(s => s.guests)
+  const syncSub = linkedHost
+    ? `Vinculado con ${linkedHost.label}`
+    : guests.length
+      ? `${guests.length} ${guests.length === 1 ? 'equipo vinculado' : 'equipos vinculados'}`
+      : 'Tu avance y tus notas entre el teléfono y la PC, por Wi-Fi'
 
   return (
     <>
@@ -91,7 +99,7 @@ function Home({ go }: { go(page: SettingsPage): void }) {
           sub={collections.length ? `${collections.length} ${collections.length === 1 ? 'colección' : 'colecciones'}` : 'Favoritos, por leer, lo que quieras'}
           onClick={() => go('colecciones')}
         />
-        <Row icon="sync" title="Sincronizar" sub="Tu avance y tus notas entre el teléfono y la PC, por Wi-Fi" onClick={() => go('sincronizar')} />
+        <Row icon="sync" title="Sincronizar" sub={syncSub} onClick={() => go('sincronizar')} />
         <Row icon="info" title="Acerca de Mitzi" sub={`Versión ${__MITZI_VERSION__} · autor, privacidad y licencias`} onClick={() => go('acerca')} />
       </nav>
 

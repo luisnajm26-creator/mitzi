@@ -45,10 +45,15 @@ export interface MitziNativeApi {
   saveImage(bytes: Uint8Array, name: string): Promise<boolean>
   copyImage(bytes: Uint8Array): Promise<void>
   /** Abre el servidor de sincronización en la red local; devuelve sus direcciones y puerto. */
-  syncStart(port: number): Promise<{ hosts: string[]; port: number }>
+  syncStart(port: number, me: { id: string; label: string }): Promise<{ hosts: string[]; port: number }>
   syncStop(): Promise<void>
   /** La respuesta a un pedido que llegó por `onSyncIncoming` (ok = false: código equivocado). */
   syncReply(id: number, ok: boolean, body: string): Promise<void>
   onSyncIncoming(cb: (id: number, body: string) => void): () => void
   syncRequest(hosts: string[], port: number, body: string): Promise<string>
+  /** Pregunta en la red por PCs con Mitzi esperando. */
+  syncDiscover(port: number): Promise<{ host: string; port: number; id: string }[]>
+  /** Nombre de esta PC. */
+  deviceLabel(): Promise<string>
+  setTray(on: boolean): Promise<void>
 }

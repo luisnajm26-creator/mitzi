@@ -30,7 +30,7 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     openExternal: url => void window.open(url, '_blank'),
     saveImage: async (png, name) => api.saveImage(new Uint8Array(await png.arrayBuffer()), name),
     copyImage: async png => api.copyImage(new Uint8Array(await png.arrayBuffer())),
-    async syncServe(port, onRequest) {
+    async syncServe(port, me, onRequest) {
       offSync?.()
       offSync = api.onSyncIncoming(async (id, body) => {
         try {
@@ -39,13 +39,16 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
           await api.syncReply(id, false, '')
         }
       })
-      return api.syncStart(port)
+      return api.syncStart(port, me)
     },
     async syncStop() {
       offSync?.()
       offSync = null
       await api.syncStop()
     },
+    syncDiscover: () => api.syncDiscover(47123),
+    deviceLabel: () => api.deviceLabel(),
+    setTray: on => void api.setTray(on),
     async syncRequest(hosts, port, body) {
       try {
         return await api.syncRequest(hosts, port, body)

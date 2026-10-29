@@ -67,6 +67,7 @@
     "files": [
       "dist/**/*",
       "dist-electron/**/*",
+      "resources/icon.png",
       "package.json",
       "!node_modules/**/*"
     ],

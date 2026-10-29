@@ -20,3 +20,13 @@ export function deviceId() {
 
 /** Cómo se llama este dispositivo en los avisos («Sincronizado con tu PC»). */
 export const deviceName = () => (platform.kind === 'android' ? 'Android' : 'PC')
+
+let label: Promise<string> | null = null
+
+/** El nombre del equipo que se ve en el otro: el del sistema, o «Android» / «PC». */
+export function deviceLabel() {
+  label ??= (platform.deviceLabel?.() ?? Promise.resolve(''))
+    .catch(() => '')
+    .then(l => l.trim() || deviceName())
+  return label
+}

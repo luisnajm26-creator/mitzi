@@ -29,7 +29,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.HttpURLConnection;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.URL;
@@ -439,11 +442,67 @@ public class MitziLibraryPlugin extends Plugin {
         }).start();
     }
 
+    /**
+     * Pregunta en la red local «¿dónde hay una PC con Mitzi?» (un mensaje UDP a toda la red) y
+     * junta las respuestas: así el teléfono encuentra a su PC aunque haya cambiado de dirección.
+     */
+    @PluginMethod
+    public void syncDiscover(PluginCall call) {
+        int port = call.getInt("port", 47123);
+        new Thread(() -> {
+            JSArray found = new JSArray();
+            try (DatagramSocket socket = new DatagramSocket()) {
+                socket.setBroadcast(true);
+                socket.setSoTimeout(300);
+                byte[] ask = "MITZI?".getBytes(StandardCharsets.UTF_8);
+                socket.send(new DatagramPacket(ask, ask.length, InetAddress.getByName("255.255.255.255"), port));
+                long until = System.currentTimeMillis() + 1500;
+                byte[] buffer = new byte[512];
+                while (System.currentTimeMillis() < until) {
+                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                    try {
+                        socket.receive(packet);
+                    } catch (java.net.SocketTimeoutException e) {
+                        continue;
+                    }
+                    String text = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+                    if (!text.startsWith("MITZI!")) continue;
+                    JSObject info = new JSObject(text.substring(6));
+                    JSObject peer = new JSObject();
+                    peer.put("host", packet.getAddress().getHostAddress());
+                    peer.put("port", info.getInt("port"));
+                    peer.put("id", info.getString("id"));
+                    found.put(peer);
+                }
+            } catch (Exception e) {
+                // sin red o sin permiso: se devuelve lo que se haya encontrado
+            }
+            JSObject result = new JSObject();
+            result.put("peers", found);
+            call.resolve(result);
+        }).start();
+    }
+
+    /** El nombre del teléfono que eligió su dueño («HUAWEI Pura 70 Ultra»), o el modelo. */
+    @PluginMethod
+    public void deviceLabel(PluginCall call) {
+        String name = null;
+        try {
+            name = Settings.Global.getString(getContext().getContentResolver(), "device_name");
+        } catch (Exception e) {
+            // algunos sistemas no lo dan
+        }
+        if (name == null || name.trim().isEmpty()) name = Build.MANUFACTURER + " " + Build.MODEL;
+        JSObject result = new JSObject();
+        result.put("label", name.trim());
+        call.resolve(result);
+    }
+
     /** Un POST mínimo de HTTP/1.1 (el servidor de Mitzi en la PC cierra la conexión al responder). */
     private static String postLocal(String host, int port, String body) throws Exception {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
         try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(host, port), 4000);
+            socket.connect(new InetSocketAddress(host, port), 2500);
             // una vez conectados, unir los datos en la PC puede tardar
             socket.setSoTimeout(90000);
             OutputStream out = socket.getOutputStream();

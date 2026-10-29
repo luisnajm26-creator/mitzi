@@ -56,8 +56,22 @@ export interface Platform {
    * Espera sincronizaciones de otro dispositivo en la red local (PC). `onRequest` recibe lo que
    * llegó y devuelve la respuesta; si lanza un error (código equivocado) se responde que no.
    */
-  syncServe?(port: number, onRequest: (body: string) => Promise<string>): Promise<{ hosts: string[]; port: number }>
+  syncServe?(port: number, me: { id: string; label: string }, onRequest: (body: string) => Promise<string>): Promise<{ hosts: string[]; port: number }>
   syncStop?(): Promise<void>
   /** Manda una sincronización a otra PC de la red local; prueba cada dirección. */
   syncRequest?(hosts: string[], port: number, body: string): Promise<string>
+  /** Pregunta en la red local qué PC con Mitzi está esperando (por si cambió de dirección). */
+  syncDiscover?(): Promise<SyncPeer[]>
+  /** Nombre del equipo para mostrarlo en el otro («Pura 70 Ultra», el nombre de la PC). */
+  deviceLabel?(): Promise<string>
+  /** Al cerrar la ventana, Mitzi queda en la bandeja del sistema (PC). */
+  setTray?(on: boolean): void
+}
+
+/** Una PC con Mitzi que respondió en la red. */
+export interface SyncPeer {
+  host: string
+  port: number
+  /** su `deviceId()` */
+  id: string
 }

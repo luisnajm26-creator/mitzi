@@ -1280,3 +1280,26 @@
   animation: fade-in 260ms ease both;
   pointer-events: none;
 }
+
+/* «Avanzaste en otro equipo»: con botones, así que sí recibe toques */
+.elsewhere-toast {
+  pointer-events: auto;
+  padding: 6px 8px 6px 18px;
+}
+
+.elsewhere-toast button {
+  display: inline-flex;
+  align-items: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-weight: 700;
+  color: var(--r-bg);
+  background: var(--r-fg);
+}
+
+.elsewhere-toast button[aria-label] {
+  padding: 7px;
+  color: var(--r-fg);
+  background: transparent;
+}

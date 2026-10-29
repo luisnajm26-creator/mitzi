@@ -24,6 +24,8 @@ export interface Snapshot {
 /** Cuántas cosas cambiaron en este dispositivo al sincronizar. */
 export interface MergeResult {
   progress: number
+  /** libros cuyo avance cambió (el lector lo usa para ofrecer ir a la página nueva) */
+  progressIds: string[]
   annotations: number
   bookmarks: number
   collections: number
@@ -71,7 +73,7 @@ const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringif
  * del otro, los dos quedan iguales. Ante dos versiones de lo mismo gana la que se cambió al último.
  */
 export async function mergeSnapshot(remote: Snapshot): Promise<MergeResult> {
-  const result: MergeResult = { progress: 0, annotations: 0, bookmarks: 0, collections: 0, days: 0 }
+  const result: MergeResult = { progress: 0, progressIds: [], annotations: 0, bookmarks: 0, collections: 0, days: 0 }
   const me = deviceId()
   await flushStats()
   await db.transaction('rw', [db.progress, db.annotations, db.bookmarks, db.collections, db.readingDays, db.books], async () => {
@@ -79,6 +81,7 @@ export async function mergeSnapshot(remote: Snapshot): Promise<MergeResult> {
     const changedProgress = remote.progress.filter(p => p.updatedAt > (progress.get(p.bookId)?.updatedAt ?? -1))
     await db.progress.bulkPut(changedProgress)
     result.progress = changedProgress.length
+    result.progressIds = changedProgress.map(p => p.bookId)
 
     const annotations = new Map((await db.annotations.toArray()).map(a => [a.id, a]))
     const changedNotes = remote.annotations.filter(a => a.updatedAt > (annotations.get(a.id)?.updatedAt ?? -1))

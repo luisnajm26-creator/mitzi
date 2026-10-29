@@ -59,6 +59,10 @@ export default function Reader({ bookId }: { bookId: string }) {
   const [bookmarks, setBookmarks] = useState<BookmarkRecord[]>([])
   const lastLocation = useRef<string | null>(null)
   const [goalDone, setGoalDone] = useState<number | null>(null)
+  /** este libro avanzó en otro equipo (llegó al sincronizar): se ofrece ir a esa página */
+  const [elsewhere, setElsewhere] = useState<{ location: string; fraction: number } | null>(null)
+  /** cuándo se guardó por última vez el avance desde aquí (para saber si el que llega es más nuevo) */
+  const savedAt = useRef(0)
   /** ¿se cumplió la meta del día? Se celebra una sola vez por día. */
   const checkGoal = async () => {
     const goal = useReaderSettings.getState().global.dailyGoal
@@ -130,7 +134,21 @@ export default function Reader({ bookId }: { bookId: string }) {
     const l = pending.current
     if (!l) return
     pending.current = null
-    await db.progress.put({ bookId, location: l.location, fraction: l.fraction, chapter: l.chapter, updatedAt: Date.now() })
+    savedAt.current = Date.now()
+    await db.progress.put({ bookId, location: l.location, fraction: l.fraction, chapter: l.chapter, updatedAt: savedAt.current })
+  }, [bookId])
+
+  // si al sincronizar llegó un avance más nuevo de este libro (se leyó en otro equipo), se ofrece ir
+  useEffect(() => {
+    const onSynced = async (e: Event) => {
+      const ids = (e as CustomEvent<{ progressIds: string[] }>).detail?.progressIds ?? []
+      if (!ids.includes(bookId)) return
+      const remote = await db.progress.get(bookId)
+      if (!remote || remote.updatedAt <= savedAt.current || engineRef.current?.showing(remote.location)) return
+      setElsewhere({ location: remote.location, fraction: remote.fraction })
+    }
+    window.addEventListener('mitzi:sincronizado', onSynced)
+    return () => window.removeEventListener('mitzi:sincronizado', onSynced)
   }, [bookId])
 
   const back = useCallback(async () => {
@@ -349,6 +367,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         resetPaceSession()
         startReadingSession(bookId)
         const [blob, progress] = await Promise.all([platform.readBlob(record.path), db.progress.get(bookId)])
+        savedAt.current = progress?.updatedAt ?? 0
         if (cancelled || !stageRef.current) return
         engine = record.format === 'pdf' ? new PdfEngine(callbacks) : new EpubEngine(callbacks)
         engineRef.current = engine
@@ -855,6 +874,22 @@ export default function Reader({ bookId }: { bookId: string }) {
       {panel === 'comfort' && book && <ComfortPanel bookId={bookId} format={isReflowable(book.format) ? 'epub' : 'pdf'} onClose={() => setPanel(null)} />}
 
       <div className="reader-dim" style={{ opacity: (1 - (brightnessPreview ?? settings.brightness)) * 0.9 }} aria-hidden />
+      {elsewhere && (
+        <div className="goal-toast elsewhere-toast" role="status">
+          <span>Avanzaste en otro equipo ({Math.round(elsewhere.fraction * 100)} %)</span>
+          <button
+            onClick={() => {
+              engineRef.current?.goTo(elsewhere.location)
+              setElsewhere(null)
+            }}
+          >
+            Ir allí
+          </button>
+          <button onClick={() => setElsewhere(null)} aria-label="Seguir aquí">
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
       {goalDone !== null && (
         <div className="goal-toast" role="status">
           <Icon name="check" size={18} /> ¡Cumpliste tu meta de hoy! ({goalDone} min)

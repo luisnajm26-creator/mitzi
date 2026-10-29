@@ -8,6 +8,8 @@ import { splashGone } from './splash'
 import { checkForUpdate } from './updates'
 import { useApp } from './store'
 import { useAppSettings } from './settings'
+import { initHost } from '../sync/host'
+import { autoSync } from '../sync/auto'
 
 const Reader = lazy(() => import('../reader/Reader'))
 
@@ -22,6 +24,9 @@ export function App() {
       .then(() => splashGone)
       .then(() => {
         syncLibrary()
+        // la PC atiende a sus equipos vinculados; el teléfono se pone al día con su PC
+        initHost()
+        autoSync('inicio')
         // ¿hay una versión nueva publicada? (a lo sumo una vez al día; sin internet no pasa nada)
         if (useAppSettings.getState().autoUpdates) setTimeout(() => checkForUpdate().catch(() => {}), 4000)
         const idle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1200))
@@ -30,11 +35,24 @@ export function App() {
     const offLibrary = platform.onLibraryChanged(() => syncLibrary())
     // al volver a la app (p. ej. después de copiar libros) se revisan las carpetas
     const onVisible = () => {
-      if (document.visibilityState === 'visible') syncLibrary()
+      if (document.visibilityState !== 'visible') return
+      syncLibrary()
+      autoSync('volver')
     }
+    // al cerrar un libro, lo leído se pasa a la PC enseguida
+    const offView = useApp.subscribe((state, prev) => {
+      if (prev.view.name === 'reader' && state.view.name === 'shelf') autoSync('libro')
+    })
+    // en la PC: quedarse en la bandeja al cerrar, si se eligió
+    platform.setTray?.(useAppSettings.getState().keepInTray)
+    const offTray = useAppSettings.subscribe((s, prev) => {
+      if (s.keepInTray !== prev.keepInTray) platform.setTray?.(s.keepInTray)
+    })
     document.addEventListener('visibilitychange', onVisible)
     return () => {
       offLibrary()
+      offView()
+      offTray()
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])

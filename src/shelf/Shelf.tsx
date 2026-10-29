@@ -10,6 +10,7 @@ import { Explorer } from './Explorer'
 import { Settings, type SettingsPage } from './Settings'
 import { CollectionPicker } from './Collections'
 import { addFolder, useFolders } from './Folders'
+import { useSyncClient } from '../sync/auto'
 import { UpdateToast } from './UpdateToast'
 import { StatsPanel } from './StatsPanel'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
@@ -261,6 +262,7 @@ export function Shelf({ active }: { active: boolean }) {
           {failed.length === 1 ? '1 libro no se pudo leer' : `${failed.length} libros no se pudieron leer`}
         </button>
       )}
+      {!scanning && <SyncNotice />}
       {failedOpen && <FailedPanel onClose={() => setFailedOpen(false)} />}
       {settingsPage && <Settings initialPage={settingsPage} onClose={() => setSettingsPage(null)} />}
       {pickingCollection && book && <CollectionPicker book={book} onClose={() => setPickingCollection(false)} />}
@@ -279,6 +281,22 @@ export function Shelf({ active }: { active: boolean }) {
         }}
       />
     </section>
+  )
+}
+
+/** «Llegó lo último de tu PC»: unos segundos, cuando la sincronización automática trajo algo. */
+function SyncNotice() {
+  const notice = useSyncClient(s => s.notice)
+  useEffect(() => {
+    if (!notice) return
+    const id = setTimeout(() => useSyncClient.setState({ notice: null }), 4000)
+    return () => clearTimeout(id)
+  }, [notice])
+  if (!notice) return null
+  return (
+    <div className="scan-toast" role="status">
+      <Icon name="sync" size={16} /> {notice}
+    </div>
   )
 }
 

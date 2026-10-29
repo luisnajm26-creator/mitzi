@@ -68,7 +68,7 @@ Lector de libros electrónicos y cómics para **Android** y **Windows**. Gratis,
 - En la PC, voces naturales con un servidor de voz local como [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI).
 
 **🔄 Sincronizar sin cuentas**
-- Tu avance, subrayados, notas, marcadores, colecciones y estadísticas pasan del teléfono a la PC (y al revés) escaneando un código QR. Va directo por tu Wi-Fi, cifrado, sin internet ni servidores de nadie.
+- Vinculas tu teléfono o tablet con la PC escaneando un código QR, una sola vez. Desde ahí tu avance, subrayados, notas, marcadores, colecciones y estadísticas se ponen al día solos al abrir Mitzi y al cerrar un libro. Va directo por tu Wi-Fi, cifrado, sin internet ni servidores de nadie.
 
 **💬 Compartir citas**
 
