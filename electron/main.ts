@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { LibraryService } from './library.js'
 import { installUpdate } from './updater.js'
+import { SyncServer, syncRequest } from './sync.js'
 import type { UpdateInfo } from '../shared/native-api.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -32,6 +33,7 @@ if (!app.requestSingleInstanceLock()) app.quit()
 
 let win: BrowserWindow | null = null
 let wakeLockId: number | null = null
+const syncServer = new SyncServer()
 
 const library = new LibraryService(
   path.join(app.getPath('userData'), 'biblioteca.json'),
@@ -112,6 +114,11 @@ function registerIpc() {
   })
   // Electron 44 usa el portapapeles al estilo web (ClipboardItem con un Blob)
   ipcMain.handle('image:copy', (_e, bytes: Uint8Array) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(bytes)], { type: 'image/png' }) })]))
+  // sincronizar por Wi-Fi: el servidor solo vive mientras la pantalla muestra el código
+  ipcMain.handle('sync:start', (e, port: number) => syncServer.start(port, (id, body) => e.sender.send('sync:incoming', id, body)))
+  ipcMain.handle('sync:reply', (_e, id: number, ok: boolean, body: string) => syncServer.reply(id, ok, body))
+  ipcMain.handle('sync:stop', () => syncServer.stop())
+  ipcMain.handle('sync:request', (_e, hosts: string[], port: number, body: string) => syncRequest(hosts, port, body))
   ipcMain.handle('power:keep-awake', (_e, on: boolean) => {
     if (on && wakeLockId === null) wakeLockId = powerSaveBlocker.start('prevent-display-sleep')
     if (!on && wakeLockId !== null) {
@@ -149,5 +156,6 @@ app.on('second-instance', () => {
 
 app.on('window-all-closed', () => {
   library.dispose()
+  void syncServer.stop()
   app.quit()
 })

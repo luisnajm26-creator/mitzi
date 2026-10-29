@@ -36,6 +36,15 @@ const paths = {
   chart: 'M5 20V11M11 20V5M17 20v-7M3 20h18',
   share: 'M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1',
   download: 'M12 3v12M8 11l4 4 4-4M5 21h14',
+  settings: 'M4 7h9M17 7h3M15 4.5v5M4 17h3M11 17h9M9 14.5v5',
+  sync: 'M20 8a8 8 0 0 0-14.5-2.5L4 7M4 3v4h4M4 16a8 8 0 0 0 14.5 2.5L20 17M20 21v-4h-4',
+  collection: 'M5 4h14v4H5zM6 8v12h12V8M10 12h4',
+  plus: 'M12 5v14M5 12h14',
+  wifi: 'M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.7 16a5 5 0 0 1 6.6 0M12 19.5h.01',
+  camera: 'M4 8h3l2-3h6l2 3h3v11H4zM12 17a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z',
+  clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 7v5l3 2',
+  flame: 'M12 21c-4 0-6.5-2.6-6.5-6 0-3.5 3-5.5 3.5-9 2 1.5 3 3 3 5 1-1 1.5-2.5 1.5-4 2.5 2 5 4.8 5 8 0 3.4-2.5 6-6.5 6z',
+  trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4v3h-4z',
 } as const
 
 export type IconName = keyof typeof paths

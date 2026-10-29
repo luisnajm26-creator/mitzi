@@ -7,6 +7,7 @@ import { handleBack } from './back'
 import { splashGone } from './splash'
 import { checkForUpdate } from './updates'
 import { useApp } from './store'
+import { useAppSettings } from './settings'
 
 const Reader = lazy(() => import('../reader/Reader'))
 
@@ -22,7 +23,7 @@ export function App() {
       .then(() => {
         syncLibrary()
         // ¿hay una versión nueva publicada? (a lo sumo una vez al día; sin internet no pasa nada)
-        setTimeout(() => checkForUpdate().catch(() => {}), 4000)
+        if (useAppSettings.getState().autoUpdates) setTimeout(() => checkForUpdate().catch(() => {}), 4000)
         const idle = window.requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1200))
         idle(() => void import('../reader/Reader'))
       })
@@ -44,6 +45,9 @@ export function App() {
         e.preventDefault()
         platform.toggleFullscreen()
       }
+      // en la biblioteca, Esc cierra lo último que se abrió (Configuración, una colección…);
+      // el lector maneja su propio Esc
+      else if (e.key === 'Escape' && useApp.getState().view.name === 'shelf') handleBack()
     }
     // arrastrar libros a la ventana los copia a la carpeta principal
     const onDragOver = (e: DragEvent) => e.preventDefault()

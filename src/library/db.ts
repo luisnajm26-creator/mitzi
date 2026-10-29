@@ -57,14 +57,28 @@ export interface ProgressRecord {
 
 export type HighlightColor = 'amarillo' | 'verde' | 'azul' | 'rosa' | 'lila'
 
-/** Lo leído en un día (estadísticas y meta diaria). */
-export interface ReadingDay {
-  /** 2026-10-21 */
-  day: string
+/** Lo que se leyó en un día en un dispositivo. */
+export interface DayPart {
   minutes: number
   pages: number
   /** ids de los libros que se leyeron ese día */
   books: string[]
+  /** minutos por libro (desde la 0.3) */
+  byBook?: Record<string, number>
+  /** minutos en cada hora del día, de 0 a 23 (desde la 0.3) */
+  hours?: number[]
+}
+
+/**
+ * Lo leído en un día (estadísticas y meta diaria): la suma de todos tus dispositivos.
+ * Cada dispositivo guarda su parte en `devices`; así, al sincronizar, lo que leíste en el
+ * teléfono y en la PC el mismo día se suma sin contarse dos veces.
+ */
+export interface ReadingDay extends DayPart {
+  /** 2026-10-21 */
+  day: string
+  /** la parte de cada dispositivo (por su id); falta en los días anteriores a la 0.3 */
+  devices?: Record<string, DayPart>
 }
 
 /** Marcador de página: para volver a una página sin subrayar nada. */
@@ -79,6 +93,9 @@ export interface BookmarkRecord {
   /** el comienzo del texto de esa página, para reconocerla en la lista */
   excerpt?: string
   createdAt: number
+  /** al borrarlo se marca (no se elimina) para que el borrado también llegue al otro dispositivo */
+  updatedAt?: number
+  deleted?: boolean
 }
 
 /** Subrayado (y nota opcional) dentro de un libro. */
@@ -101,6 +118,20 @@ export interface AnnotationRecord {
   deleted?: boolean
 }
 
+/** Colección propia («Favoritos», «Por leer»…). Un libro puede estar en varias. */
+export interface CollectionRecord {
+  id: string
+  name: string
+  /**
+   * Libros de la colección y cuándo se agregó o quitó cada uno: así, al sincronizar, un libro
+   * agregado en el teléfono y otro en la PC quedan los dos (gana el cambio más nuevo de cada libro).
+   */
+  items: Record<string, { at: number; removed?: boolean }>
+  createdAt: number
+  updatedAt: number
+  deleted?: boolean
+}
+
 export interface CoverRecord {
   id: string
   blob: Blob
@@ -114,6 +145,7 @@ class MitziDB extends Dexie {
   covers!: Table<CoverRecord, string>
   bookmarks!: Table<BookmarkRecord, string>
   readingDays!: Table<ReadingDay, string>
+  collections!: Table<CollectionRecord, string>
 
   constructor() {
     super('mitzi')
@@ -155,6 +187,10 @@ class MitziDB extends Dexie {
     // estadísticas: un registro por día
     this.version(5).stores({
       readingDays: 'day',
+    })
+    // colecciones propias
+    this.version(6).stores({
+      collections: 'id',
     })
   }
 }

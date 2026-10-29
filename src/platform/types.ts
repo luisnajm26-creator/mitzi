@@ -52,4 +52,12 @@ export interface Platform {
   /** Botón "atrás" del sistema (Android). */
   onBackButton?(cb: () => void): () => void
   exitApp?(): void
+  /**
+   * Espera sincronizaciones de otro dispositivo en la red local (PC). `onRequest` recibe lo que
+   * llegó y devuelve la respuesta; si lanza un error (código equivocado) se responde que no.
+   */
+  syncServe?(port: number, onRequest: (body: string) => Promise<string>): Promise<{ hosts: string[]; port: number }>
+  syncStop?(): Promise<void>
+  /** Manda una sincronización a otra PC de la red local; prueba cada dirección. */
+  syncRequest?(hosts: string[], port: number, body: string): Promise<string>
 }

@@ -1,7 +1,11 @@
 import type { MitziNativeApi } from '../../shared/native-api'
 import type { Platform } from './types'
 
+/** Electron antepone «Error invoking remote method…»: se deja solo el motivo. */
+const cleanIpcError = (e: unknown) => String(e instanceof Error ? e.message : e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+
 export function createElectronPlatform(api: MitziNativeApi): Platform {
+  let offSync: (() => void) | null = null
   return {
     kind: 'electron',
     canManageFolders: true,
@@ -26,13 +30,35 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     openExternal: url => void window.open(url, '_blank'),
     saveImage: async (png, name) => api.saveImage(new Uint8Array(await png.arrayBuffer()), name),
     copyImage: async png => api.copyImage(new Uint8Array(await png.arrayBuffer())),
+    async syncServe(port, onRequest) {
+      offSync?.()
+      offSync = api.onSyncIncoming(async (id, body) => {
+        try {
+          await api.syncReply(id, true, await onRequest(body))
+        } catch {
+          await api.syncReply(id, false, '')
+        }
+      })
+      return api.syncStart(port)
+    },
+    async syncStop() {
+      offSync?.()
+      offSync = null
+      await api.syncStop()
+    },
+    async syncRequest(hosts, port, body) {
+      try {
+        return await api.syncRequest(hosts, port, body)
+      } catch (e) {
+        throw new Error(cleanIpcError(e))
+      }
+    },
     async installUpdate(info, onProgress) {
       const off = api.onUpdateProgress(onProgress)
       try {
         return await api.installUpdate(info)
       } catch (e) {
-        // Electron antepone «Error invoking remote method…»: se deja solo el motivo
-        throw new Error(String(e instanceof Error ? e.message : e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''))
+        throw new Error(cleanIpcError(e))
       } finally {
         off()
       }

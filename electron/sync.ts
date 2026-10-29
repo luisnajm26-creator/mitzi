@@ -1,0 +1,133 @@
+import http from 'node:http'
+import os from 'node:os'
+
+/**
+ * Servidor de la sincronización por Wi-Fi: solo está abierto mientras la pantalla
+ * «Sincronizar» muestra el código. Lo que llega va cifrado; la ventana lo abre, lo une con su
+ * base de datos y devuelve la respuesta (aquí no se lee nada).
+ */
+const PATH = '/mitzi-sync'
+const MAX_BODY = 64 * 1024 * 1024
+/** Después de tantos intentos con un código equivocado se cierra: nadie puede probar códigos al azar. */
+const MAX_FAILURES = 5
+/** Si nadie se conecta, se cierra solo. */
+const OPEN_FOR_MS = 10 * 60_000
+
+type Reply = (ok: boolean, body: string) => void
+
+/** Direcciones IPv4 de esta PC en la red local, las de Wi-Fi y cable primero. */
+export function localAddresses() {
+  const out: { address: string; score: number }[] = []
+  for (const [name, list] of Object.entries(os.networkInterfaces())) {
+    for (const info of list ?? []) {
+      if (info.family !== 'IPv4' || info.internal) continue
+      // las de máquinas virtuales (WSL, VirtualBox, Hyper-V) van al final: el teléfono no las ve
+      const virtual = /vEthernet|VirtualBox|VMware|WSL|Hyper-V|docker/i.test(name)
+      const lan = /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(info.address)
+      out.push({ address: info.address, score: (lan ? 2 : 0) + (virtual ? -3 : 0) + (/wi-?fi|wlan|inal/i.test(name) ? 1 : 0) })
+    }
+  }
+  return out.sort((a, b) => b.score - a.score).map(a => a.address).slice(0, 4)
+}
+
+export class SyncServer {
+  private server: http.Server | null = null
+  private pending = new Map<number, Reply>()
+  private nextId = 1
+  private failures = 0
+  private closeTimer: NodeJS.Timeout | undefined
+
+  /** `onRequest` le pasa el pedido a la ventana; la respuesta vuelve por `reply()`. */
+  async start(preferredPort: number, onRequest: (id: number, body: string) => void) {
+    await this.stop()
+    this.failures = 0
+    const server = http.createServer((req, res) => {
+      if (req.method !== 'POST' || req.url !== PATH) {
+        res.writeHead(404).end()
+        return
+      }
+      const chunks: Buffer[] = []
+      let size = 0
+      req.on('data', (chunk: Buffer) => {
+        size += chunk.length
+        if (size > MAX_BODY) req.destroy()
+        else chunks.push(chunk)
+      })
+      req.on('end', () => {
+        const id = this.nextId++
+        const timeout = setTimeout(() => this.reply(id, false, 'sin respuesta'), 60_000)
+        this.pending.set(id, (ok, body) => {
+          clearTimeout(timeout)
+          if (ok) {
+            res.writeHead(200, { 'Content-Type': 'application/json', Connection: 'close' }).end(body)
+            return
+          }
+          res.writeHead(403, { Connection: 'close' }).end()
+          if (++this.failures >= MAX_FAILURES) void this.stop()
+        })
+        onRequest(id, Buffer.concat(chunks).toString('utf8'))
+      })
+    })
+    const port = await new Promise<number>((resolve, reject) => {
+      const listen = (p: number) => {
+        server.once('error', (e: NodeJS.ErrnoException) => {
+          // si el puerto de siempre está ocupado, cualquiera libre (va dentro del código QR)
+          if (e.code === 'EADDRINUSE' && p !== 0) listen(0)
+          else reject(e)
+        })
+        server.listen(p, '0.0.0.0', () => resolve((server.address() as { port: number }).port))
+      }
+      listen(preferredPort)
+    })
+    this.server = server
+    this.closeTimer = setTimeout(() => void this.stop(), OPEN_FOR_MS)
+    return { hosts: localAddresses(), port }
+  }
+
+  reply(id: number, ok: boolean, body: string) {
+    const done = this.pending.get(id)
+    if (!done) return
+    this.pending.delete(id)
+    done(ok, body)
+  }
+
+  async stop() {
+    clearTimeout(this.closeTimer)
+    for (const id of [...this.pending.keys()]) this.reply(id, false, 'cerrado')
+    const server = this.server
+    this.server = null
+    if (server) await new Promise<void>(resolve => server.close(() => resolve()))
+  }
+}
+
+/** Del lado que manda (PC con PC): prueba cada dirección de la otra PC hasta que una responda. */
+export async function syncRequest(hosts: string[], port: number, body: string) {
+  let lastError: Error = new Error('No se encontró la PC en la red')
+  for (const host of hosts) {
+    try {
+      return await new Promise<string>((resolve, reject) => {
+        const req = http.request(
+          { host, port, path: PATH, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }, timeout: 4000 },
+          res => {
+            const chunks: Buffer[] = []
+            res.on('data', (c: Buffer) => chunks.push(c))
+            res.on('end', () => {
+              if (res.statusCode === 200) resolve(Buffer.concat(chunks).toString('utf8'))
+              else if (res.statusCode === 403) reject(new Error('El código no coincide'))
+              else reject(new Error(`La PC respondió ${res.statusCode}`))
+            })
+          },
+        )
+        // una vez conectados, unir los datos puede tardar: se espera más
+        req.on('socket', socket => socket.on('connect', () => req.setTimeout(90_000)))
+        req.on('timeout', () => req.destroy(new Error('No responde')))
+        req.on('error', reject)
+        req.end(body)
+      })
+    } catch (e) {
+      lastError = e as Error
+      if (lastError.message === 'El código no coincide') throw lastError
+    }
+  }
+  throw lastError
+}

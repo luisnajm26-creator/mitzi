@@ -102,9 +102,11 @@ interface LightRigProps {
   color: THREE.Color
   /** 0..1 cuánto brilla (baja al abrir un libro) */
   intensity: { current: number }
+  /** partículas de polvo en el haz */
+  dust: boolean
 }
 
-export function LightRig({ floorY, color, intensity }: LightRigProps) {
+export function LightRig({ floorY, color, intensity, dust: showDust }: LightRigProps) {
   const top = floorY + 4.6
   const height = top - floorY
   const radius = 1.65
@@ -188,7 +190,7 @@ export function LightRig({ floorY, color, intensity }: LightRigProps) {
       <mesh position={[0, floorY + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} material={pool} renderOrder={1}>
         <planeGeometry args={[radius * 2.6, radius * 2.6]} />
       </mesh>
-      <points geometry={dustGeometry} material={dust} position={[0, floorY + height / 2, 0]} renderOrder={6} />
+      {showDust && <points geometry={dustGeometry} material={dust} position={[0, floorY + height / 2, 0]} renderOrder={6} />}
     </group>
   )
 }

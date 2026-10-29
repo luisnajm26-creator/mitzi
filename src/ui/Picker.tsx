@@ -33,8 +33,12 @@ export function Picker<T extends string>({ label, icon, value, options, onChange
   useLayoutEffect(() => {
     if (!open || sheet || !button.current) return
     const r = button.current.getBoundingClientRect()
-    setPos({ left: Math.max(8, Math.min(r.left, window.innerWidth - 248)), top: r.bottom + 6, minWidth: Math.max(220, r.width) })
-  }, [open, sheet])
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - 248))
+    // si abajo no cabe (el botón está al final de un panel), el menú se abre hacia arriba
+    const height = options.length * 44 + 16
+    const below = window.innerHeight - r.bottom - 8 >= height || r.top < height
+    setPos(below ? { left, top: r.bottom + 6, minWidth: Math.max(220, r.width) } : { left, bottom: window.innerHeight - r.top + 6, minWidth: Math.max(220, r.width) })
+  }, [open, sheet, options.length])
 
   const pick = (v: T) => {
     onChange(v)

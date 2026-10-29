@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useApp } from '../app/store'
 import { platform, isTouchDevice } from '../platform'
-import type { LibraryFolders } from '../platform/types'
 import { useLibrary } from '../library/store'
 import { db } from '../library/db'
-import { retryFailed, syncLibrary } from '../library/scanner'
+import { retryFailed } from '../library/scanner'
+import { useCollections } from '../library/collections'
 import { carouselBooks, useLibraryQuery, type CarouselFilter } from '../library/query'
 import { Explorer } from './Explorer'
-import { About } from './About'
+import { Settings, type SettingsPage } from './Settings'
+import { CollectionPicker } from './Collections'
+import { addFolder, useFolders } from './Folders'
 import { UpdateToast } from './UpdateToast'
 import { StatsPanel } from './StatsPanel'
 import { useReaderSettings, effectiveTheme } from '../reader/comfort/settings'
@@ -22,8 +24,9 @@ export function Shelf({ active }: { active: boolean }) {
   const allBooks = useLibrary(s => s.books)
   const carouselFilter = useLibraryQuery(s => s.carousel)
   const setCarouselFilter = useLibraryQuery(s => s.setCarousel)
-  // el carrusel muestra todo, o solo la serie o el autor elegidos en el explorador
-  const books = useMemo(() => carouselBooks(allBooks, carouselFilter), [allBooks, carouselFilter])
+  const collections = useCollections(s => s.list)
+  // el carrusel muestra todo, o solo la serie, el autor o la colección elegidos en el explorador
+  const books = useMemo(() => carouselBooks(allBooks, carouselFilter, collections), [allBooks, carouselFilter, collections])
   const [explorerOpen, setExplorerOpen] = useState(false)
   /** libro que se eligió en el explorador: el carrusel lo busca cuando la lista se actualiza */
   const pendingPick = useRef<string | null>(null)
@@ -36,18 +39,23 @@ export function Shelf({ active }: { active: boolean }) {
   const scanning = useLibrary(s => s.scanning)
   const failed = useLibrary(s => s.failed)
   const [failedOpen, setFailedOpen] = useState(false)
-  const [aboutOpen, setAboutOpen] = useState(false)
+  const [settingsPage, setSettingsPage] = useState<SettingsPage | null>(null)
+  const [pickingCollection, setPickingCollection] = useState(false)
   const [statsOpen, setStatsOpen] = useState(false)
   const openBook = useApp(s => s.openBook)
   const motion = useMemo(createMotion, [])
   const [center, setCenter] = useState(0)
   const [opening, setOpening] = useState(false)
   const [closing, setClosing] = useState(false)
-  const [foldersOpen, setFoldersOpen] = useState(false)
   const curtainColor = useReaderSettings(s => effectiveTheme(s).bg)
   const wasActive = useRef(active)
 
   const book = books[Math.min(center, books.length - 1)] ?? null
+
+  // si la colección (o serie) que se muestra se queda sin libros, se vuelve a ver todo
+  useEffect(() => {
+    if (carouselFilter && allBooks.length > 0 && books.length === 0) setCarouselFilter(null)
+  }, [carouselFilter, allBooks.length, books.length, setCarouselFilter])
 
   useEffect(() => {
     const id = pendingPick.current
@@ -116,7 +124,7 @@ export function Shelf({ active }: { active: boolean }) {
   useEffect(() => {
     if (!active) return
     const onKey = (e: KeyboardEvent) => {
-      if (foldersOpen || explorerOpen) return
+      if (settingsPage || explorerOpen || pickingCollection) return
       if (e.key === 'ArrowRight') motion.ctrl.step(1)
       else if (e.key === 'ArrowLeft') motion.ctrl.step(-1)
       else if (e.key === 'Home') motion.ctrl.goTo(0)
@@ -160,7 +168,7 @@ export function Shelf({ active }: { active: boolean }) {
               }}
               title="Ver todos los libros"
             >
-              {carouselFilter.kind === 'serie' ? 'Serie' : 'Autor'}: {carouselFilter.label}
+              {{ serie: 'Serie', autor: 'Autor', coleccion: 'Colección' }[carouselFilter.kind]}: {carouselFilter.label}
               <Icon name="close" size={14} />
             </button>
           )}
@@ -181,11 +189,8 @@ export function Shelf({ active }: { active: boolean }) {
               <Icon name="chart" />
             </button>
           )}
-          <button className="icon-button" onClick={() => setFoldersOpen(true)} title="Carpetas de libros">
-            <Icon name="folder" />
-          </button>
-          <button className="icon-button" onClick={() => setAboutOpen(true)} title="Acerca de Mitzi" aria-label="Acerca de Mitzi">
-            <Icon name="info" />
+          <button className="icon-button" onClick={() => setSettingsPage('inicio')} title="Configuración" aria-label="Configuración">
+            <Icon name="settings" />
           </button>
           {!isTouchDevice && (
             <button className="icon-button" onClick={() => platform.toggleFullscreen()} title="Pantalla completa (F11)">
@@ -217,9 +222,20 @@ export function Shelf({ active }: { active: boolean }) {
               <span className="shelf-new">Sin empezar</span>
             )}
           </div>
-          <button className="read-button" onClick={() => open(center)}>
-            {p ? 'Continuar' : 'Leer'}
-          </button>
+          <div className="shelf-buttons">
+            <button className="read-button" onClick={() => open(center)}>
+              {p ? 'Continuar' : 'Leer'}
+            </button>
+            <button
+              className="icon-button"
+              data-on={collections.some(c => c.items[book.id] && !c.items[book.id].removed)}
+              onClick={() => setPickingCollection(true)}
+              title="Guardar en una colección"
+              aria-label="Guardar en una colección"
+            >
+              <Icon name="collection" size={20} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -234,7 +250,7 @@ export function Shelf({ active }: { active: boolean }) {
         </>
       )}
 
-      {loaded && allBooks.length === 0 && !scanning && <EmptyState onFolders={() => setFoldersOpen(true)} />}
+      {loaded && allBooks.length === 0 && !scanning && <EmptyState onFolders={() => setSettingsPage('carpetas')} />}
       {scanning && (
         <div className="scan-toast">
           Leyendo libros… {scanning.done} / {scanning.total}
@@ -246,11 +262,11 @@ export function Shelf({ active }: { active: boolean }) {
         </button>
       )}
       {failedOpen && <FailedPanel onClose={() => setFailedOpen(false)} />}
-      {aboutOpen && <About onClose={() => setAboutOpen(false)} />}
+      {settingsPage && <Settings initialPage={settingsPage} onClose={() => setSettingsPage(null)} />}
+      {pickingCollection && book && <CollectionPicker book={book} onClose={() => setPickingCollection(false)} />}
       {statsOpen && <StatsPanel onClose={() => setStatsOpen(false)} />}
       {/* mientras se leen libros, arriba está ese aviso: este espera */}
       {!scanning && <UpdateToast />}
-      {foldersOpen && <FoldersPanel onClose={() => setFoldersOpen(false)} />}
       {explorerOpen && <Explorer onClose={() => setExplorerOpen(false)} onPick={pickBook} onShowGroup={showGroup} />}
       <div
         className="shelf-curtain"
@@ -264,22 +280,6 @@ export function Shelf({ active }: { active: boolean }) {
       />
     </section>
   )
-}
-
-function useFolders() {
-  const [folders, setFolders] = useState<LibraryFolders | null>(null)
-  const reload = () => platform.getFolders().then(setFolders).catch(() => setFolders({ folders: [], defaultFolder: null }))
-  useEffect(() => {
-    reload()
-  }, [])
-  return [folders, reload] as const
-}
-
-const label = (folder: string) => platform.folderLabel?.(folder) ?? folder
-
-/** Agrega una carpeta y vuelve a revisar la biblioteca. */
-const addFolder = async () => {
-  if (await platform.addFolder()) await syncLibrary()
 }
 
 function EmptyState({ onFolders }: { onFolders(): void }) {
@@ -363,50 +363,6 @@ function FailedPanel({ onClose }: { onClose(): void }) {
         >
           Reintentar
         </button>
-      </div>
-    </div>
-  )
-}
-
-function FoldersPanel({ onClose }: { onClose(): void }) {
-  const [folders, reload] = useFolders()
-  useBackHandler(true, onClose)
-  return (
-    <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" onClick={e => e.stopPropagation()} role="dialog" aria-label="Carpetas de libros">
-        <header className="sheet-header">
-          <h2>Carpetas de libros</h2>
-          <button className="icon-button" onClick={onClose} aria-label="Cerrar">
-            <Icon name="close" />
-          </button>
-        </header>
-        <p className="sheet-note">Mitzi revisa estas carpetas (y sus subcarpetas) y muestra los libros que encuentre: EPUB, PDF, MOBI, AZW3, FB2 y CBZ.</p>
-        <ul className="folder-list">
-          {folders?.folders.map(folder => (
-            <li key={folder}>
-              <code>{label(folder)}</code>
-              <div className="folder-actions">
-                {platform.kind === 'electron' && (
-                  <button className="ghost-button small" onClick={() => platform.revealFolder(folder)}>
-                    Abrir
-                  </button>
-                )}
-                {platform.canManageFolders && folder !== folders.defaultFolder && (
-                  <button className="ghost-button small" onClick={() => platform.removeFolder(folder).then(reload).then(() => syncLibrary())}>
-                    Quitar
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-        {platform.canManageFolders ? (
-          <button className="read-button" onClick={() => addFolder().then(reload)}>
-            Agregar carpeta
-          </button>
-        ) : (
-          <p className="sheet-note">En el navegador de desarrollo se usa la carpeta libros-prueba del proyecto.</p>
-        )}
       </div>
     </div>
   )

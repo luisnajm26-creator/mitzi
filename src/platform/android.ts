@@ -16,6 +16,7 @@ interface MitziLibraryPlugin {
   safeArea(): Promise<{ top?: number; right?: number; bottom?: number; left?: number }>
   shareImage(options: { data: string; name: string }): Promise<void>
   installUpdate(options: { url: string; sumsUrl: string; name: string }): Promise<{ status: 'installing' | 'needs-permission' }>
+  syncRequest(options: { hosts: string[]; port: number; body: string }): Promise<{ body: string }>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
   addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
 }
@@ -137,6 +138,8 @@ export function createAndroidPlatform(): Platform {
       setTimeout(applySafeArea, 300)
     },
     setHighRefresh: on => Library.setHighRefresh({ on }).catch(() => {}),
+    // por el plugin: la página no puede pedir http a la red local (Android lo bloquea)
+    syncRequest: async (hosts, port, body) => (await Library.syncRequest({ hosts, port, body })).body,
     onBackButton: cb => listen(() => App.addListener('backButton', cb)),
     exitApp: () => App.exitApp(),
   }

@@ -4,7 +4,7 @@ import { deriveTheme } from './comfort/contrast'
 import { FONT_IDS, FONTS } from './comfort/fonts'
 import { effectiveSettings, useReaderSettings, type ComfortSettings } from './comfort/settings'
 import { CUSTOM_THEME_ID, THEMES, type ThemePreset } from './comfort/themes'
-import { Section, Segment, Slider, Stepper, Toggle } from './controls'
+import { Section, Segment, Slider, Stepper, Toggle } from '../ui/controls'
 import { VoiceServerSection } from './tts/VoiceServer'
 import { playPaperSound } from './paperSound'
 

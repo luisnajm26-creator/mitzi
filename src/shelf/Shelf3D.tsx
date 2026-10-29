@@ -8,11 +8,14 @@ import { CarouselController } from './carousel'
 import { LightRig } from './LightRig'
 import { BOOK_HEIGHT, bookDims, createBookModel, getShared } from './textures'
 import { hideSplashAfterPaint } from '../app/splash'
+import { useAppSettings } from '../app/settings'
 
 /** Vueltas del libro central (radianes por segundo). */
 const SPIN_SPEED = 0.42
 /** Sin tocar nada durante este tiempo, el libro deja de girar y se pausa el dibujo. */
 const IDLE_MS = 25_000
+/** Con el ahorro de batería se pausa antes. */
+const SAVER_IDLE_MS = 8_000
 /** Duración de la animación de abrir un libro. */
 export const OPEN_MS = 1300
 /** Al volver del lector, la misma animación al revés: el libro se cierra y vuelve al estante. */
@@ -241,6 +244,10 @@ interface SceneProps {
 }
 
 function Scene({ books, motion, palette, onCenterChange, onTap, onSleep }: SceneProps) {
+  const spinOn = useAppSettings(s => s.shelfSpin)
+  const saver = useAppSettings(s => s.batterySaver)
+  const dust = useAppSettings(s => s.shelfDust && !s.batterySaver)
+  const idleMs = saver ? SAVER_IDLE_MS : IDLE_MS
   const size = useThree(s => s.size)
   const camera = useThree(s => s.camera)
   const scene = useThree(s => s.scene)
@@ -278,7 +285,7 @@ function Scene({ books, motion, palette, onCenterChange, onTap, onSleep }: Scene
     ctrl.update(dt)
 
     const idleFor = performance.now() - ctrl.lastInput
-    const target = idleFor > IDLE_MS ? 0 : SPIN_SPEED
+    const target = idleFor > idleMs || !spinOn ? 0 : SPIN_SPEED
     spin.speed += (target - spin.speed) * (1 - Math.exp(-dt * 1.6))
 
     // al abrir un libro: luz de lectura desde la cámara y el foco se apaga al final
@@ -296,7 +303,7 @@ function Scene({ books, motion, palette, onCenterChange, onTap, onSleep }: Scene
       setCenter(ctrl.center)
       onCenterChange(ctrl.center)
     }
-    if (idleFor > IDLE_MS + 3500 && ctrl.settled && motion.openingAt === null && motion.closingAt === null) onSleep()
+    if (idleFor > idleMs + 3500 && ctrl.settled && motion.openingAt === null && motion.closingAt === null) onSleep()
   })
 
   const floorY = layout.bookY - BOOK_HEIGHT / 2 - 0.03
@@ -305,13 +312,13 @@ function Scene({ books, motion, palette, onCenterChange, onTap, onSleep }: Scene
 
   return (
     <>
-      <PerformanceGuard />
+      {!saver && <PerformanceGuard />}
       <ambientLight intensity={0.28} />
       <hemisphereLight args={['#cfc8ff', '#120e18', 0.55]} />
       <spotLight ref={spot} position={[0, floorY + 4.9, 1.3]} angle={0.42} penumbra={0.85} intensity={46} decay={2} />
       <directionalLight ref={readLight} position={[0, 1.2, 6]} intensity={0.5} />
       <pointLight ref={rim} position={[0, 1.4, -2.6]} intensity={9} distance={9} />
-      <LightRig floorY={floorY} color={colors.beam} intensity={motion.intensity} />
+      <LightRig floorY={floorY} color={colors.beam} intensity={motion.intensity} dust={dust} />
       {books.slice(from, to).map((book, i) => (
         <Book key={book.id} book={book} index={from + i} motion={motion} layout={layout} anisotropy={anisotropy} onTap={onTap} />
       ))}
@@ -330,6 +337,7 @@ interface Shelf3DProps {
 
 export function Shelf3D({ books, motion, palette, active, onCenterChange, onOpen }: Shelf3DProps) {
   const [awake, setAwake] = useState(true)
+  const saver = useAppSettings(s => s.batterySaver)
   const awakeRef = useRef(awake)
   awakeRef.current = awake
   const pointer = useRef<{ id: number; x: number; y: number; dragging: boolean } | null>(null)
@@ -419,7 +427,7 @@ export function Shelf3D({ books, motion, palette, active, onCenterChange, onOpen
       onWheel={onWheel}
     >
       <Canvas
-        dpr={[1, Math.min(2, window.devicePixelRatio)]}
+        dpr={saver ? 1 : [1, Math.min(2, window.devicePixelRatio)]}
         frameloop={frameloop}
         camera={{ fov: FOV, near: 0.05, far: 80, position: [0, CAMERA_Y, 8] }}
         gl={{ antialias: window.devicePixelRatio < 2, alpha: true, powerPreference: 'high-performance' }}

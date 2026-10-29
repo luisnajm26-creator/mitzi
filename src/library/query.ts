@@ -1,12 +1,13 @@
 import { create } from 'zustand'
-import type { BookRecord, ProgressRecord } from './db'
+import type { BookRecord, CollectionRecord, ProgressRecord } from './db'
+import { booksIn } from './collections'
 import { normalize } from './series'
 
 export type StatusFilter = 'todos' | 'leyendo' | 'sin-empezar' | 'terminados'
 import type { BookFormat } from './formats'
 
 export type FormatFilter = 'todos' | BookFormat
-export type GroupBy = 'serie' | 'autor' | 'ninguno'
+export type GroupBy = 'serie' | 'autor' | 'coleccion' | 'ninguno'
 export type SortBy = 'recientes' | 'titulo' | 'autor' | 'agregados'
 
 export interface LibraryQuery {
@@ -17,9 +18,10 @@ export interface LibraryQuery {
   sort: SortBy
 }
 
-/** Lo que se muestra en el carrusel: todo, o solo una serie o un autor. */
+/** Lo que se muestra en el carrusel: todo, o solo una serie, un autor o una colección. */
 export interface CarouselFilter {
-  kind: 'serie' | 'autor'
+  kind: 'serie' | 'autor' | 'coleccion'
+  /** clave de la serie o del autor, o id de la colección */
   key: string
   label: string
 }
@@ -84,12 +86,23 @@ export interface BookGroup {
 }
 
 /**
- * Agrupa por serie (solo si hay 2 tomos o más; el resto va a "Libros sueltos") o por autor.
- * Los grupos se ordenan igual que los libros: por lectura reciente, título o autor.
+ * Agrupa por serie (solo si hay 2 tomos o más; el resto va a "Libros sueltos"), por autor o por
+ * colección (un libro puede salir en varias). Los grupos se ordenan como los libros.
  */
-export function groupBooks(books: BookRecord[], progress: Progress, q: LibraryQuery): BookGroup[] {
+export function groupBooks(books: BookRecord[], progress: Progress, q: LibraryQuery, collections: CollectionRecord[] = []): BookGroup[] {
   const sorted = sortBooks(books, progress, q.sort)
   if (q.group === 'ninguno') return [{ key: 'todos', label: 'Todos los libros', kind: null, books: sorted }]
+  if (q.group === 'coleccion') {
+    const placed = new Set<string>()
+    const groups: BookGroup[] = collections.map(c => {
+      const ids = new Set(booksIn(c))
+      const list = sorted.filter(b => ids.has(b.id))
+      for (const b of list) placed.add(b.id)
+      return { key: c.id, label: c.name, kind: 'coleccion', books: list }
+    })
+    const rest = sorted.filter(b => !placed.has(b.id))
+    return [...groups.filter(g => g.books.length), ...(rest.length ? [{ key: '~sin', label: 'Sin colección', kind: null, books: rest }] : [])]
+  }
 
   const map = new Map<string, BookRecord[]>()
   for (const b of sorted) {
@@ -120,8 +133,13 @@ export function groupBooks(books: BookRecord[], progress: Progress, q: LibraryQu
 }
 
 /** Libros del carrusel según el filtro activo (una serie va en orden de tomos). */
-export function carouselBooks(books: BookRecord[], filter: CarouselFilter | null) {
+export function carouselBooks(books: BookRecord[], filter: CarouselFilter | null, collections: CollectionRecord[] = []) {
   if (!filter) return books
   if (filter.kind === 'serie') return books.filter(b => b.seriesKey === filter.key).sort(byVolume)
+  if (filter.kind === 'coleccion') {
+    const c = collections.find(c => c.id === filter.key)
+    const ids = new Set(c ? booksIn(c) : [])
+    return books.filter(b => ids.has(b.id))
+  }
   return books.filter(b => authorKey(b) === filter.key)
 }

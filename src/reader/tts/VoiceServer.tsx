@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Section } from '../controls'
+import { Section } from '../../ui/controls'
 import { loadVoiceServer, saveVoiceServer, serverVoices } from './backends'
 
 const DEFAULT_URL = 'http://localhost:8880/v1'

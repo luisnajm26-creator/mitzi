@@ -40,15 +40,15 @@ Lector de libros electrónicos y cómics para **Android** y **Windows**. Gratis,
   </tr>
 </table>
 
-<img src="docs/capturas/libro-abierto.webp" alt="En la PC y en tablets en horizontal, el libro se abre a dos páginas con relieve" />
-<p align="center"><sub>En la PC y en tablets en horizontal, el libro se abre a dos páginas, con el grosor de hojas que cambia según tu avance y una hoja de papel que gira al pasar página.</sub></p>
+<p align="center"><img src="docs/capturas/hoja.gif" width="640" alt="El libro abierto a dos páginas y una hoja de papel que gira al pasar página" /></p>
+<p align="center"><sub>En la PC y en tablets en horizontal, el libro se abre a dos páginas, con el grosor de hojas que cambia según tu avance y una hoja de papel que gira al pasar página (grabado de la app real).</sub></p>
 
 ## Qué hace
 
 **📚 Biblioteca**
 - Se llena sola: eliges carpetas y Mitzi detecta los libros nuevos, sin reiniciar.
 - Carrusel 3D: el libro elegido gira bajo un foco de luz y el fondo toma los colores de su portada.
-- Explorador con búsqueda (sin importar tildes), filtros y libros agrupados por serie o por autor. Pensado para miles de libros.
+- Explorador con búsqueda (sin importar tildes), filtros y libros agrupados por serie, por autor o por tus **colecciones** («Favoritos», «Por leer»…). Pensado para miles de libros.
 - **Formatos:** EPUB, PDF, Kindle (MOBI, AZW, AZW3, sin DRM), FB2 y cómics CBZ.
 
 **📖 Lectura**
@@ -61,11 +61,14 @@ Lector de libros electrónicos y cómics para **Android** y **Windows**. Gratis,
 **✍️ Herramientas**
 - Marcadores, subrayados en 5 colores y notas, con exportación a Markdown.
 - Búsqueda dentro del libro, y definir o traducir lo que seleccionas.
-- **Tu lectura:** minutos por día, racha y una meta diaria. Todo queda en tu dispositivo.
+- **Tu lectura:** minutos por semana, mes y año, calendario de días leídos, rachas, a qué hora lees, los libros que más leíste y una meta diaria.
 
 **🎧 Voz**
 - Lectura en voz alta que resalta la oración y pasa de página sola, con temporizador para dormir.
 - En la PC, voces naturales con un servidor de voz local como [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI).
+
+**🔄 Sincronizar sin cuentas**
+- Tu avance, subrayados, notas, marcadores, colecciones y estadísticas pasan del teléfono a la PC (y al revés) escaneando un código QR. Va directo por tu Wi-Fi, cifrado, sin internet ni servidores de nadie.
 
 **💬 Compartir citas**
 
@@ -79,6 +82,7 @@ Seleccionas un fragmento y Mitzi lo convierte en una tarjeta para tus historias 
 - Probada en Huawei con EMUI (sin servicios de Google) y en navegadores internos viejos.
 - Pantalla completa de verdad, gesto atrás y 120 Hz durante las animaciones.
 - Se actualiza desde la misma app, comprobando la huella de cada descarga.
+- Configuración en un solo lugar: carpetas, colecciones, giro y polvo de la biblioteca, ahorro de batería, sonido, actualizaciones y tus datos.
 
 ## Descargar
 
@@ -127,13 +131,15 @@ npm run electron:dev  # app de PC
 | `npm run llave` | Crea la llave para firmar el APK (una sola vez; se guarda en `~/.mitzi`, fuera del repositorio) |
 | `npm run publicar` | Arma una versión (instalador, APK firmado y `SHA256SUMS.txt`); con `-- --subir` la publica en GitHub |
 | `npx electron scripts/capturas.mjs` | Rehace las capturas de este README (con `npm run dev` abierto) |
+| `npx electron scripts/gif-hoja.mjs` | Rehace el GIF de la hoja que gira (con `npm run dev` abierto) |
 
 ```
 src/
   app/        arranque, pantalla de inicio, gesto atrás, actualizaciones y datos del autor
   platform/   lo que cambia entre PC, Android y navegador (carpetas, archivos, pantalla completa)
-  library/    base de datos local, detección de libros, portadas, paletas y estadísticas
-  shelf/      carrusel 3D (three.js + react-three-fiber), explorador, «Acerca de» y «Tu lectura»
+  library/    base de datos local, detección de libros, portadas, paletas, colecciones y estadísticas
+  shelf/      carrusel 3D (three.js + react-three-fiber), explorador, Configuración y «Tu lectura»
+  sync/       sincronizar por Wi-Fi: qué se manda, cómo se une y el cifrado
   reader/     lector: motores EPUB (foliate-js) y PDF (pdf.js), hoja que gira, temas, notas, voz y citas
 electron/     proceso principal de la app de PC
 android/      proyecto de Android (Capacitor) con su plugin propio
@@ -166,6 +172,7 @@ Hola, soy **Luis A.** Hice Mitzi por puro gusto personal, a raíz de mi afición
 - [pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0): motor de PDF
 - [three.js](https://threejs.org) y [react-three-fiber](https://github.com/pmndrs/react-three-fiber) (MIT): carrusel 3D
 - [hyphen](https://github.com/ytiurin/hyphen) (ISC): separación silábica
+- [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0) y [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT): leer y dibujar el código para sincronizar
 - [RPG Audio de Kenney](https://kenney.nl/assets/rpg-audio) (CC0): sonido de hoja al pasar página
 - Tipografías Literata, Merriweather, Atkinson Hyperlegible Next, Nunito y OpenDyslexic (SIL Open Font License) vía [Fontsource](https://fontsource.org)
 
@@ -182,7 +189,7 @@ Hola, soy **Luis A.** Hice Mitzi por puro gusto personal, a raíz de mi afición
 
 <br />
 
-**Mitzi** is a free, open-source e-book and comic reader for Android and Windows. Your library is shown like a game-console carousel: the selected book spins under a spotlight and the background takes the colors of its cover. On wide screens the book opens into two pages with a paper sheet that turns. It reads EPUB, PDF, MOBI/AZW3, FB2 and CBZ, offers pastel and dark themes with auto-contrast text, highlights and notes, read-aloud, quote cards for social media, and updates itself from this repository's Releases. It works on phones without Google services.
+**Mitzi** is a free, open-source e-book and comic reader for Android and Windows. Your library is shown like a game-console carousel: the selected book spins under a spotlight and the background takes the colors of its cover. On wide screens the book opens into two pages with a paper sheet that turns. It reads EPUB, PDF, MOBI/AZW3, FB2 and CBZ, offers pastel and dark themes with auto-contrast text, highlights and notes, collections, reading stats, read-aloud, quote cards for social media, account-free phone↔PC sync over Wi-Fi (scan a QR code; encrypted, no cloud), and updates itself from this repository's Releases. It works on phones without Google services.
 
 **Mitzi ships with no books**: you add your own files. Built with the help of Claude (AI): the idea, design and device testing are the author's. Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 

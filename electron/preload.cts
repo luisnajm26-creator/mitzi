@@ -26,6 +26,11 @@ const api: MitziNativeApi = {
   onUpdateProgress: cb => listen<[number]>('update:progress', cb),
   saveImage: (bytes, name) => ipcRenderer.invoke('image:save', bytes, name),
   copyImage: bytes => ipcRenderer.invoke('image:copy', bytes),
+  syncStart: port => ipcRenderer.invoke('sync:start', port),
+  syncStop: () => ipcRenderer.invoke('sync:stop'),
+  syncReply: (id, ok, body) => ipcRenderer.invoke('sync:reply', id, ok, body),
+  onSyncIncoming: cb => listen<[number, string]>('sync:incoming', cb),
+  syncRequest: (hosts, port, body) => ipcRenderer.invoke('sync:request', hosts, port, body),
 }
 
 contextBridge.exposeInMainWorld('mitziNative', api)

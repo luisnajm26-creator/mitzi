@@ -3,6 +3,7 @@ import { db, type BookRecord } from '../library/db'
 import { filterBooks, groupBooks, statusOf, useLibraryQuery, type CarouselFilter, type FormatFilter, type GroupBy, type SortBy, type StatusFilter } from '../library/query'
 import { FORMAT_LABELS, type BookFormat } from '../library/formats'
 import { useLibrary } from '../library/store'
+import { useCollections } from '../library/collections'
 import { handleBack, useBackHandler } from '../app/back'
 import { isDark, mix } from '../lib/color'
 import { Icon } from '../ui/Icon'
@@ -99,6 +100,7 @@ const STATUS: { id: StatusFilter; label: string }[] = [
 const GROUPS: { value: GroupBy; label: string }[] = [
   { value: 'serie', label: 'Por serie' },
   { value: 'autor', label: 'Por autor' },
+  { value: 'coleccion', label: 'Por colección' },
   { value: 'ninguno', label: 'Sin agrupar' },
 ]
 
@@ -122,6 +124,7 @@ interface Props {
 export function Explorer({ onClose, onPick, onShowGroup }: Props) {
   const books = useLibrary(s => s.books)
   const progress = useLibrary(s => s.progress)
+  const collections = useCollections(s => s.list)
   const query = useLibraryQuery(s => s.query)
   const setQuery = useLibraryQuery(s => s.setQuery)
   const input = useRef<HTMLInputElement>(null)
@@ -148,7 +151,7 @@ export function Explorer({ onClose, onPick, onShowGroup }: Props) {
     ]
   }, [books])
   const matches = useMemo(() => filterBooks(books, progress, query), [books, progress, query])
-  const groups = useMemo(() => groupBooks(matches, progress, query), [matches, progress, query])
+  const groups = useMemo(() => groupBooks(matches, progress, query, collections), [matches, progress, query, collections])
   const counts = useMemo(() => {
     const c: Record<StatusFilter, number> = { todos: books.length, leyendo: 0, 'sin-empezar': 0, terminados: 0 }
     for (const b of books) c[statusOf(b, progress)]++
@@ -197,6 +200,9 @@ export function Explorer({ onClose, onPick, onShowGroup }: Props) {
 
       <div className="explorer-body">
         {groups.length === 0 && <p className="explorer-empty">No hay libros que coincidan con la búsqueda.</p>}
+        {query.group === 'coleccion' && collections.length === 0 && (
+          <p className="explorer-empty">Todavía no tienes colecciones. En la biblioteca, toca el botón de colección junto a «Leer» para guardar un libro en una.</p>
+        )}
         {groups.map(g => (
           <section key={g.key} className="explorer-group">
             {query.group !== 'ninguno' && (

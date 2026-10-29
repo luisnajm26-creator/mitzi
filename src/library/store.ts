@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { db, type BookRecord, type ProgressRecord } from './db'
+import { refreshCollections } from './collections'
 
 interface LibraryState {
   books: BookRecord[]
@@ -30,6 +31,7 @@ export async function refreshLibrary() {
     db.books.filter(b => !b.missing).toArray(),
     db.progress.toArray(),
     db.files.filter(f => f.bookId === '!error').toArray(),
+    refreshCollections(),
   ])
   books.sort(byRecent)
   useLibrary.setState({

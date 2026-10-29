@@ -24,12 +24,16 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -392,6 +396,86 @@ public class MitziLibraryPlugin extends Plugin {
             call.resolve();
         } catch (Exception e) {
             call.reject("No se pudo compartir: " + e.getMessage());
+        }
+    }
+
+    // ---------- sincronizar por Wi-Fi ----------
+
+    /**
+     * Manda la sincronización (ya cifrada por la app) a la PC de la red local y devuelve su
+     * respuesta. Va por un socket propio y no por HttpURLConnection: Android bloquea el http sin
+     * cifrar en las conexiones normales, y abrirlo para toda la app sería menos seguro. Los datos
+     * viajan cifrados con el código de la PC, así que nadie en la red puede leerlos.
+     */
+    @PluginMethod
+    public void syncRequest(PluginCall call) {
+        JSArray hosts = call.getArray("hosts");
+        int port = call.getInt("port", 47123);
+        String body = call.getString("body", "");
+        new Thread(() -> {
+            String error = "No se encontró la PC en la red";
+            try {
+                for (int i = 0; i < hosts.length(); i++) {
+                    String host = hosts.getString(i);
+                    // solo direcciones de la red local: no sirve para mandar datos a internet
+                    if (!host.matches("^(192\\.168|10|172\\.(1[6-9]|2[0-9]|3[01]))(\\.[0-9]{1,3}){2,3}$")) continue;
+                    try {
+                        String reply = postLocal(host, port, body);
+                        JSObject result = new JSObject();
+                        result.put("body", reply);
+                        call.resolve(result);
+                        return;
+                    } catch (SecurityException e) {
+                        call.reject(e.getMessage());
+                        return;
+                    } catch (Exception e) {
+                        error = "No responde (" + host + "): " + e.getMessage();
+                    }
+                }
+            } catch (Exception e) {
+                error = e.getMessage();
+            }
+            call.reject(error);
+        }).start();
+    }
+
+    /** Un POST mínimo de HTTP/1.1 (el servidor de Mitzi en la PC cierra la conexión al responder). */
+    private static String postLocal(String host, int port, String body) throws Exception {
+        byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(host, port), 4000);
+            // una vez conectados, unir los datos en la PC puede tardar
+            socket.setSoTimeout(90000);
+            OutputStream out = socket.getOutputStream();
+            String head = "POST /mitzi-sync HTTP/1.1\r\n"
+                + "Host: " + host + ":" + port + "\r\n"
+                + "Content-Type: application/json\r\n"
+                + "Content-Length: " + bytes.length + "\r\n"
+                + "Connection: close\r\n\r\n";
+            out.write(head.getBytes(StandardCharsets.US_ASCII));
+            out.write(bytes);
+            out.flush();
+
+            InputStream in = socket.getInputStream();
+            ByteArrayOutputStream raw = new ByteArrayOutputStream();
+            byte[] buffer = new byte[65536];
+            int n;
+            while ((n = in.read(buffer)) != -1) raw.write(buffer, 0, n);
+            byte[] all = raw.toByteArray();
+            // los encabezados terminan en la primera línea vacía
+            int split = -1;
+            for (int i = 0; i + 3 < all.length; i++) {
+                if (all[i] == '\r' && all[i + 1] == '\n' && all[i + 2] == '\r' && all[i + 3] == '\n') {
+                    split = i;
+                    break;
+                }
+            }
+            if (split < 0) throw new Exception("respuesta incompleta");
+            String headers = new String(all, 0, split, StandardCharsets.US_ASCII);
+            String status = headers.split("\r\n", 2)[0];
+            if (status.contains(" 403")) throw new SecurityException("El código no coincide");
+            if (!status.contains(" 200")) throw new Exception(status);
+            return new String(all, split + 4, all.length - split - 4, StandardCharsets.UTF_8);
         }
     }
 

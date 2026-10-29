@@ -367,7 +367,7 @@ export default function Reader({ bookId }: { bookId: string }) {
         ])
         if (cancelled) return
         setAnnotations(saved.filter(a => !a.deleted))
-        setBookmarks(marks.sort((a, b) => a.fraction - b.fraction))
+        setBookmarks(marks.filter(b => !b.deleted).sort((a, b) => a.fraction - b.fraction))
         setStatus('ready')
         hideTimer.current = setTimeout(() => setChrome(false), 2200)
       } catch (e) {
@@ -580,9 +580,11 @@ export default function Reader({ bookId }: { bookId: string }) {
     () => (loc && status === 'ready' ? bookmarks.find(b => engineRef.current?.showing(b.location)) : undefined),
     [bookmarks, loc, status],
   )
+  // se marca como borrado en vez de eliminarlo, para que el borrado también se sincronice
+  const removeBookmark = (id: string) => db.bookmarks.update(id, { deleted: true, updatedAt: Date.now() })
   const toggleBookmark = () => {
     if (currentBookmark) {
-      db.bookmarks.delete(currentBookmark.id)
+      removeBookmark(currentBookmark.id)
       setBookmarks(list => list.filter(b => b.id !== currentBookmark.id))
       return
     }
@@ -596,6 +598,7 @@ export default function Reader({ bookId }: { bookId: string }) {
       label: loc.chapter ?? loc.pageLabel,
       excerpt: here.excerpt,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
     }
     db.bookmarks.put(record)
     setBookmarks(list => [...list, record].sort((a, b) => a.fraction - b.fraction))
@@ -816,7 +819,7 @@ export default function Reader({ bookId }: { bookId: string }) {
             setPanel(null)
           }}
           onDeleteBookmark={b => {
-            db.bookmarks.delete(b.id)
+            removeBookmark(b.id)
             setBookmarks(list => list.filter(x => x.id !== b.id))
           }}
           onGo={a => {

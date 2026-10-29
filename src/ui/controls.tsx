@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
+import './controls.css'
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (

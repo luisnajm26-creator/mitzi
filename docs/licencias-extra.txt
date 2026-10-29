@@ -49,6 +49,12 @@ Su paquete de npm no incluye el archivo de licencia; el texto MIT está al
 final de este archivo.
 
 ------------------------------------------------------------------------
+qrcode-generator · MIT · https://github.com/kazuhikoarase/qrcode-generator
+Copyright (c) 2009 Kazuhiko Arase
+Dibuja el código QR para sincronizar. Su paquete de npm no incluye el archivo de
+licencia; el texto MIT está al final de este archivo.
+
+------------------------------------------------------------------------
 Patrones de separación silábica (paquete «hyphen», tomados de hyph-utf8 / CTAN)
 https://github.com/hyphenation/tex-hyphen
 

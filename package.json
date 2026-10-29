@@ -1,7 +1,7 @@
 {
   "name": "mitzi",
   "productName": "Mitzi",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Lector de EPUB y PDF de código abierto, con biblioteca 3D estilo selector de videojuegos.",
   "license": "MIT",
   "author": "Luis Angel Lopez",
@@ -35,7 +35,9 @@
     "@react-three/fiber": "^9.8.2",
     "dexie": "^4.4.6",
     "hyphen": "^1.14.1",
+    "jsqr": "1.4.0",
     "pdfjs-dist": "^6.4.299",
+    "qrcode-generator": "2.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "three": "^0.186.1",
@@ -50,6 +52,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "electron": "^44.8.0",
     "electron-builder": "^26.15.3",
+    "gifenc": "1.0.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.4"
   },
