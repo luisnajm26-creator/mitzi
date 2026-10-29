@@ -100,7 +100,8 @@ export function AboutContent() {
           quedan en este dispositivo. Solo se conecta a internet para buscar actualizaciones (una vez al día, a GitHub) y
           cuando tú pides definir o traducir algo (abre la RAE o DeepL con el texto que elegiste). Las voces naturales, si las
           configuras, hablan con un servidor de tu propia PC. Al sincronizar, los datos van directo de un equipo a otro por tu
-          Wi-Fi, cifrados con una llave que solo tienen los equipos que vinculaste: no pasan por internet.
+          Wi-Fi, cifrados con una llave que solo tienen los equipos que vinculaste: no pasan por internet. Los libros no
+          pueden ejecutar código dentro de Mitzi.
         </p>
       </details>
 

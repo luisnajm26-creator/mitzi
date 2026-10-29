@@ -92,5 +92,8 @@ export function unlinkPeer(id: string) {
 
 /** Al abrir la app (o al vincular uno nuevo): si hay equipos vinculados, se queda atenta a ellos. */
 export function initHost() {
-  if (platform.syncServe && useLinks.getState().peers.length) void startHost()
+  if (!platform.syncServe) return
+  if (useLinks.getState().peers.length) void startHost()
+  // sin vínculos no se atiende a nadie (en Android el servidor sobrevive a recargar la página)
+  else if (!useSyncHost.getState().pairing) void platform.syncStop?.()
 }

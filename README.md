@@ -149,7 +149,7 @@ docs/         listas de pruebas, notas de cada versión y capturas
 
 React + TypeScript + Vite, empaquetado con Electron (Windows) y Capacitor (Android). Los motores de EPUB y PDF comparten una misma interfaz (`src/reader/engines/types.ts`), así el relieve del libro, las notas y la voz no tienen que distinguir el formato.
 
-¿Quieres ayudar? Lee [CONTRIBUTING.md](CONTRIBUTING.md). [CLAUDE.md](CLAUDE.md) es el mapa del proyecto: cómo funciona por dentro y las trampas conocidas.
+¿Quieres ayudar? Lee [CONTRIBUTING.md](CONTRIBUTING.md). [CLAUDE.md](CLAUDE.md) es el mapa del proyecto: cómo funciona por dentro y las trampas conocidas. Cómo se protege Mitzi y cómo reportar una falla de seguridad: [SECURITY.md](SECURITY.md).
 
 </details>
 

@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
 
@@ -652,11 +653,26 @@ public class MitziLibraryPlugin extends Plugin {
         for (PendingSync pending : pendingSync.values()) pending.done.countDown();
     }
 
+    /** Pedidos a la vez: nadie en la red puede trabar a Mitzi abriendo cientos de conexiones. */
+    private final Semaphore syncSlots = new Semaphore(4);
+    /** Lo que mide de verdad una sincronización está muy por debajo. */
+    private static final int MAX_SYNC_BODY = 16 * 1024 * 1024;
+
     private void acceptSync(ServerSocket server) {
         while (!server.isClosed()) {
             try {
                 Socket socket = server.accept();
-                new Thread(() -> handleSync(socket)).start();
+                if (!syncSlots.tryAcquire()) {
+                    socket.close();
+                    continue;
+                }
+                new Thread(() -> {
+                    try {
+                        handleSync(socket);
+                    } finally {
+                        syncSlots.release();
+                    }
+                }).start();
             } catch (Exception e) {
                 return;
             }
@@ -684,7 +700,7 @@ public class MitziLibraryPlugin extends Plugin {
                 if (line.toLowerCase(Locale.ROOT).startsWith("content-length:")) length = Integer.parseInt(line.substring(15).trim());
             }
             OutputStream out = socket.getOutputStream();
-            if (!headers.startsWith("POST /mitzi-sync ") || length <= 0 || length > 64 * 1024 * 1024) {
+            if (!headers.startsWith("POST /mitzi-sync ") || length <= 0 || length > MAX_SYNC_BODY) {
                 out.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 return;
             }

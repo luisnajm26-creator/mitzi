@@ -77,6 +77,13 @@ Todos los equipos son iguales: la PC, el teléfono y la tablet se vinculan entre
 | 47 | Reinicia el módem para que los equipos cambien de dirección | Se encuentran solos y se sincronizan igual |
 | 48 | **Desvincular** un equipo en uno de los dos | Ya no se sincronizan; en el otro dice que ya no lo reconoce y que lo vuelvas a vincular. Escribir un código equivocado al vincular dice «El código no coincide», y tras 5 intentos el código deja de servir |
 
+## Seguridad
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 48b | Actualiza Mitzi Prueba en el teléfono y vuelve a vincular un equipo | Se vinculan igual que antes (ahora la llave no viaja por la red: se calcula en cada equipo). Los vínculos que ya tenías siguen funcionando |
+| 48c | Abre varios libros en el teléfono y en la PC (EPUB con ilustraciones y un PDF) | Se ven igual que antes: la regla nueva solo impide que un libro ejecute código |
+
 ## README
 
 | # | Haz esto | Debe pasar |

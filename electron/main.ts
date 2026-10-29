@@ -7,24 +7,13 @@ import { installUpdate } from './updater.js'
 import os from 'node:os'
 import { discover, SyncServer, syncRequest } from './sync.js'
 import type { UpdateInfo } from '../shared/native-api.js'
+import { CSP } from '../shared/csp.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.join(here, '..', '..')
 const distDir = path.join(appRoot, 'dist')
 const devServerUrl = process.env.VITE_DEV_SERVER_URL
 
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self' 'unsafe-inline' blob:",
-  "img-src 'self' blob: data:",
-  "font-src 'self' blob: data:",
-  "media-src 'self' blob: data:",
-  // localhost: servidor de voz en la misma PC (voces naturales)
-  "connect-src 'self' blob: data: https://api.github.com http://localhost:* http://127.0.0.1:* https://*.supabase.co wss://*.supabase.co",
-  "worker-src 'self' blob:",
-  "frame-src 'self' blob:",
-].join('; ')
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'mitzi', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },

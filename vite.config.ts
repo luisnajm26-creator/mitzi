@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { CSP } from './shared/csp'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const testBooksDir = path.join(root, 'libros-prueba')
@@ -86,6 +87,19 @@ function thirdPartyLicenses(): Plugin {
 }
 
 /**
+ * Al compilar, pone la CSP en la página (en Android no hay otra forma de dársela; en la PC
+ * también llega como encabezado). En desarrollo no: Vite necesita scripts en línea.
+ * Va después de lo que Capacitor inyecta al abrir <head>, así que no frena su puente.
+ */
+function contentSecurityPolicy(): Plugin {
+  return {
+    name: 'mitzi-csp',
+    apply: 'build',
+    transformIndexHtml: html => html.replace('<meta charset="UTF-8" />', `<meta charset="UTF-8" />\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+  }
+}
+
+/**
  * Solo en desarrollo con navegador: expone los libros de `libros-prueba/`
  * y avisa a la app cuando se agregan o borran archivos.
  */
@@ -129,7 +143,7 @@ export default defineConfig({
   define: {
     __MITZI_VERSION__: JSON.stringify(pkg.version),
   },
-  plugins: [react(), devBooks(), thirdPartyLicenses()],
+  plugins: [react(), devBooks(), thirdPartyLicenses(), contentSecurityPolicy()],
   resolve: {
     alias: {
       'foliate-js': path.join(root, 'vendor/foliate-js'),

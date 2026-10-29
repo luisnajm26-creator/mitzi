@@ -10,7 +10,10 @@ import os from 'node:os'
  * También responde por UDP a «¿dónde estás?»: si la PC cambió de dirección, el teléfono la encuentra.
  */
 const PATH = '/mitzi-sync'
-const MAX_BODY = 64 * 1024 * 1024
+/** lo que mide de verdad una sincronización (avance, notas, días) está muy por debajo */
+const MAX_BODY = 16 * 1024 * 1024
+/** pedidos a la vez: nadie en la red puede trabar a Mitzi abriendo cientos de conexiones */
+const MAX_CONNECTIONS = 6
 const ASK = 'MITZI?'
 const ANSWER = 'MITZI!'
 
@@ -59,6 +62,7 @@ export class SyncServer {
       req.on('data', (chunk: Buffer) => {
         size += chunk.length
         if (size > MAX_BODY) req.destroy()
+        else if (Number(req.headers['content-length'] ?? 0) > MAX_BODY) req.destroy()
         else chunks.push(chunk)
       })
       req.on('end', () => {
@@ -79,6 +83,10 @@ export class SyncServer {
         this.onRequest?.(id, Buffer.concat(chunks).toString('utf8'), remote)
       })
     })
+    server.maxConnections = MAX_CONNECTIONS
+    // quien abre una conexión y no manda nada (o manda muy lento) se corta
+    server.headersTimeout = 10_000
+    server.requestTimeout = 60_000
     const port = await new Promise<number>((resolve, reject) => {
       const listen = (p: number) => {
         server.once('error', (e: NodeJS.ErrnoException) => {

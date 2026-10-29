@@ -64,8 +64,31 @@ type Kind = 'pedido' | 'respuesta'
  */
 export type Secret = { code: string } | { key: string; from: string }
 
-/** Llave nueva de un vínculo: 32 bytes al azar, en base64. */
-export const newKey = () => toBase64(crypto.getRandomValues(new Uint8Array(32)))
+/**
+ * Al vincular, la llave del vínculo no viaja: cada equipo crea un par de llaves de un solo uso
+ * (Diffie-Hellman con curva P-256), se mandan solo la parte pública y cada uno calcula por su
+ * lado el mismo secreto. Así, aunque alguien grabara la vinculación y algún día adivinara el
+ * código, no podría sacar la llave. El código también entra en la cuenta: si alguien se metiera
+ * en medio sin saberlo, los dos equipos terminarían con llaves distintas y no se entenderían.
+ */
+export async function newExchange() {
+  const pair = (await crypto.subtle.generateKey({ name: 'ECDH', namedCurve: 'P-256' }, false, ['deriveBits'])) as CryptoKeyPair
+  const pub = toBase64(new Uint8Array(await crypto.subtle.exportKey('raw', pair.publicKey)))
+  return { pair, pub }
+}
+
+/** La llave del vínculo (base64) a partir de mi par de llaves, la parte pública del otro y el código. */
+export async function agreeKey(pair: CryptoKeyPair, otherPub: string, code: string) {
+  const other = await crypto.subtle.importKey('raw', fromBase64(otherPub), { name: 'ECDH', namedCurve: 'P-256' }, false, [])
+  const shared = await crypto.subtle.deriveBits({ name: 'ECDH', public: other }, pair.privateKey, 256)
+  const base = await crypto.subtle.importKey('raw', shared, 'HKDF', false, ['deriveBits'])
+  const key = await crypto.subtle.deriveBits(
+    { name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode(cleanCode(code)), info: new TextEncoder().encode('mitzi-vinculo-1') },
+    base,
+    256,
+  )
+  return toBase64(new Uint8Array(key))
+}
 
 const rawKeys = new Map<string, Promise<CryptoKey>>()
 const keyOfRaw = (key: string) => {

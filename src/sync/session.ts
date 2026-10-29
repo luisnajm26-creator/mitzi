@@ -1,6 +1,6 @@
 import { platform } from '../platform'
 import { refreshLibrary } from '../library/store'
-import { cleanCode, newKey, open, peek, seal } from './crypto'
+import { agreeKey, cleanCode, newExchange, open, peek, seal } from './crypto'
 import { deviceId, deviceLabel } from './device'
 import { useLinks, type Link } from './links'
 import { mergeSnapshot, takeSnapshot, type MergeResult, type Snapshot } from './snapshot'
@@ -47,15 +47,18 @@ export function parseManual(address: string, code: string): SyncTarget | null {
   return { hosts: [m[1]], port: m[2] ? Number(m[2]) : SYNC_PORT, code: clean }
 }
 
-/** Lo que viaja: los datos y, al vincular, quién es cada uno (y la llave nueva, de vuelta). */
+/**
+ * Lo que viaja: los datos y, al vincular, quién es cada uno y la parte pública de su llave de un
+ * solo uso (`pub`), con la que los dos calculan la llave del vínculo sin mandarla.
+ */
 interface SyncRequest {
   snapshot: Snapshot
-  link?: { id: string; label: string }
+  link?: { id: string; label: string; pub?: string }
 }
 
 interface SyncResponse {
   snapshot: Snapshot
-  link?: { id: string; label: string; key: string }
+  link?: { id: string; label: string; pub: string }
 }
 
 /** Después de unir: la biblioteca se actualiza y el lector se entera (por si su libro avanzó en otro lado). */
@@ -74,7 +77,8 @@ export const isRejected = (e: unknown) => e instanceof Error && /coincide/.test(
 export async function pairWith(target: SyncTarget): Promise<SyncOutcome> {
   if (!platform.syncRequest) throw new Error('Este dispositivo no puede sincronizar')
   const secret = { code: target.code }
-  const request: SyncRequest = { snapshot: await takeSnapshot(), link: { id: deviceId(), label: await deviceLabel() } }
+  const exchange = await newExchange()
+  const request: SyncRequest = { snapshot: await takeSnapshot(), link: { id: deviceId(), label: await deviceLabel(), pub: exchange.pub } }
   const reply = await platform.syncRequest(target.hosts, target.port, await seal(secret, 'pedido', request))
   let response: SyncResponse
   try {
@@ -84,7 +88,9 @@ export async function pairWith(target: SyncTarget): Promise<SyncOutcome> {
   }
   if (response.link) {
     const now = Date.now()
-    useLinks.getState().savePeer({ ...response.link, linkedAt: now, lastSync: now, hosts: target.hosts, port: target.port })
+    const key = await agreeKey(exchange.pair, response.link.pub, target.code)
+    const { id, label } = response.link
+    useLinks.getState().savePeer({ id, label, key, linkedAt: now, lastSync: now, hosts: target.hosts, port: target.port })
   }
   const result = await mergeSnapshot(response.snapshot)
   await afterMerge(result)
@@ -119,16 +125,21 @@ export async function answerSync(body: string, pairingCode: string | null, remot
     const secret = { code: pairingCode }
     const request = await open<SyncRequest>(secret, 'pedido', body)
     const now = Date.now()
-    const key = newKey()
-    if (request.link) links.savePeer({ id: request.link.id, label: request.link.label, key, linkedAt: now, lastSync: now, ...seen })
+    const exchange = await newExchange()
+    // sin la parte pública del otro no se vincula (versiones de prueba anteriores)
+    const linking = request.link?.pub ? request.link : null
+    if (linking) {
+      const key = await agreeKey(exchange.pair, linking.pub!, pairingCode)
+      links.savePeer({ id: linking.id, label: linking.label, key, linkedAt: now, lastSync: now, ...seen })
+    }
     const result = await mergeSnapshot(request.snapshot)
     const response: SyncResponse = {
       snapshot: await takeSnapshot(),
-      link: request.link && { id: deviceId(), label: await deviceLabel(), key },
+      link: linking ? { id: deviceId(), label: await deviceLabel(), pub: exchange.pub } : undefined,
     }
     const reply = await seal(secret, 'respuesta', response)
     await afterMerge(result)
-    return { reply, paired: !!request.link, name: request.snapshot.name, label: request.link?.label ?? request.snapshot.name, peerId: request.link?.id, result }
+    return { reply, paired: !!linking, name: request.snapshot.name, label: request.link?.label ?? request.snapshot.name, peerId: linking?.id, result }
   }
   const peer = links.peers.find(p => p.id === envelope.from)
   if (!peer) throw new Error('Equipo no vinculado')
