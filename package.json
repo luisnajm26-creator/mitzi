@@ -1,7 +1,7 @@
 {
   "name": "mitzi",
   "productName": "Mitzi",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Lector de EPUB y PDF de código abierto, con biblioteca 3D estilo selector de videojuegos.",
   "license": "MIT",
   "author": "Luis Angel Lopez",

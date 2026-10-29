@@ -31,6 +31,61 @@ function listBooks(dir: string, base = dir, depth = 0): DevBook[] {
 }
 
 /**
+ * Al compilar, escribe `licencias.txt` con la licencia de cada paquete que termina dentro de
+ * la app (las licencias MIT, Apache y OFL piden acompañar las copias con su texto). Se arma
+ * con los módulos que de verdad entraron al bundle, no con una lista a mano que envejecería.
+ * Lo que no viene de npm (sonidos, patrones de guiones, Android) va en docs/licencias-extra.txt.
+ */
+function thirdPartyLicenses(): Plugin {
+  const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.(md|txt))?$/i
+  return {
+    name: 'mitzi-licencias',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const packages = new Map<string, string>()
+      for (const item of Object.values(bundle)) {
+        const ids =
+          item.type === 'chunk'
+            ? [...(item.moduleIds ?? Object.keys(item.modules))]
+            : [...(item.originalFileNames ?? [])].map(f => path.resolve(root, f))
+        for (const id of ids) {
+          const norm = id.split('\\').join('/')
+          const npm = norm.match(/^(.*\/node_modules\/(?:@[^/]+\/)?[^/]+)\//)
+          if (npm) packages.set(npm[1], npm[1])
+          else if (norm.includes('/vendor/foliate-js/')) packages.set('foliate-js', path.join(root, 'vendor', 'foliate-js'))
+        }
+      }
+      const blocks = [...packages.values()]
+        .map(dir => {
+          let pkg: { name?: string; version?: string; license?: string; homepage?: string } = {}
+          try {
+            pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
+          } catch {
+            // foliate-js no publica package.json con todo: se usa el nombre de la carpeta
+          }
+          const texts = fs
+            .readdirSync(dir)
+            .filter(f => LICENSE_FILE.test(f))
+            .map(f => fs.readFileSync(path.join(dir, f), 'utf8').trim())
+          const name = pkg.name ?? path.basename(dir)
+          const head = `${name}${pkg.version ? ` ${pkg.version}` : ''} · ${pkg.license ?? 'ver texto'}${pkg.homepage ? `\n${pkg.homepage}` : ''}`
+          return { name, text: `${head}\n\n${texts.join('\n\n') || '(el paquete no incluye el texto de su licencia)'}` }
+        })
+        .sort((a, b) => a.name.localeCompare(b.name))
+      const extra = fs.readFileSync(path.join(root, 'docs', 'licencias-extra.txt'), 'utf8').trim()
+      const rule = '\n\n' + '='.repeat(72) + '\n\n'
+      const source =
+        'Mitzi usa software y recursos de otras personas. Estas son sus licencias.\n' +
+        'El código de Mitzi es MIT: https://github.com/luisnajm26-creator/mitzi/blob/main/LICENSE' +
+        rule +
+        [...blocks.map(b => b.text), extra].join(rule) +
+        '\n'
+      this.emitFile({ type: 'asset', fileName: 'licencias.txt', source })
+    },
+  }
+}
+
+/**
  * Solo en desarrollo con navegador: expone los libros de `libros-prueba/`
  * y avisa a la app cuando se agregan o borran archivos.
  */
@@ -74,7 +129,7 @@ export default defineConfig({
   define: {
     __MITZI_VERSION__: JSON.stringify(pkg.version),
   },
-  plugins: [react(), devBooks()],
+  plugins: [react(), devBooks(), thirdPartyLicenses()],
   resolve: {
     alias: {
       'foliate-js': path.join(root, 'vendor/foliate-js'),

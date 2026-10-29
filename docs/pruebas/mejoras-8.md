@@ -38,3 +38,10 @@ Algunos libros juntan varias ilustraciones en un mismo capítulo (por ejemplo «
 | 16 | Prueba también el Vol 6 (cinco ilustraciones) | Igual: cada una en su par de páginas |
 | 17 | En el teléfono, las mismas ilustraciones | Cada una llena el ancho de la pantalla, centrada, una por página |
 | 18 | Un capítulo normal con una ilustración suelta | Sigue igual que antes |
+
+## Licencias y privacidad
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 19 | En **Acerca de**, abre **Privacidad** | Explica que Mitzi no recoge datos y cuándo se conecta a internet |
+| 20 | Abre **Créditos y licencias** › **Ver el texto completo de las licencias** | Aparece un recuadro con todas las licencias, que se puede desplazar y seleccionar |

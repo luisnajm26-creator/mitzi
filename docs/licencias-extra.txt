@@ -1,0 +1,101 @@
+LO QUE NO VIENE DE NPM
+
+Este archivo se agrega al final de licencias.txt al compilar (vite.config.ts).
+
+------------------------------------------------------------------------
+Sonido de hoja (public/sounds/hoja-1.ogg, hoja-2.ogg, hoja-3.ogg)
+
+«RPG Audio» de Kenney (www.kenney.nl), archivos bookFlip1-3.ogg.
+Licencia: Creative Commons Zero (CC0), dominio público.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+------------------------------------------------------------------------
+Librerías que foliate-js incluye por dentro (vendor/foliate-js/vendor)
+
+zip.js · BSD-3-Clause · https://github.com/gildas-lormeau/zip.js
+Copyright (c) 2023, Gildas Lormeau
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice,
+   this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+3. Neither the name of the copyright holder nor the names of its contributors
+   may be used to endorse or promote products derived from this software
+   without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+fflate · MIT · https://github.com/101arrowz/fflate
+Copyright (c) 2026 Arjun Barrett
+(texto de la licencia MIT al final de este archivo)
+
+------------------------------------------------------------------------
+@react-three/fiber · MIT · https://github.com/pmndrs/react-three-fiber
+Copyright (c) 2019-2025 Poimandres
+Su paquete de npm no incluye el archivo de licencia; el texto MIT está al
+final de este archivo.
+
+------------------------------------------------------------------------
+Patrones de separación silábica (paquete «hyphen», tomados de hyph-utf8 / CTAN)
+https://github.com/hyphenation/tex-hyphen
+
+Español     Copyright (C) 1993, 1997 Javier Bezos, 2001-2019 Javier Bezos, CervanTeX · MIT
+Inglés (EE. UU.)  Copyright (C) 1990, 2004, 2005 Gerard D.C. Kuiken
+            «Copying and distribution of this file, with or without modification,
+            are permitted in any medium without royalty provided the copyright
+            notice and this notice are preserved.»
+Portugués   Pedro J. de Rezende, J. Joao Dias Almeida, Leonardo Araujo, Aline Benevides · BSD-3-Clause
+Francés     Copyright (C) 1994-2002 Daniel Flipo, Bernard Gaulle, 2016 Arthur Reutenauer · MIT
+Italiano    Copyright (C) 2008-2011 Claudio Beccari · LPPL 1.3 o posterior, o MIT
+Alemán      Copyright (c) 2013-2024 Stephan Hennig, Werner Lemberg, Günter Milde,
+            Sander van Geloven, Georg Pfeiffer, Gisbert W. Selke, Tobias Wendorf, Keno Wehr · MIT
+Catalán     Gonçal Badenes · LPPL 1 o posterior
+            https://www.latex-project.org/lppl/
+
+------------------------------------------------------------------------
+App de Android
+
+Capacitor (MIT, Ionic) y bibliotecas AndroidX (Apache-2.0, The Android Open
+Source Project). El texto de la licencia Apache 2.0 está arriba, junto a pdfjs-dist.
+
+App de Windows
+
+Electron (MIT) y Chromium: sus licencias van en la carpeta de instalación,
+en LICENSE.electron.txt y LICENSES.chromium.html.
+
+------------------------------------------------------------------------
+Ícono, textos y diseño de Mitzi: parte del proyecto, bajo su licencia MIT.
+
+------------------------------------------------------------------------
+TEXTO DE LA LICENCIA MIT
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

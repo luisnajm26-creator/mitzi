@@ -37,6 +37,26 @@ function UpdateCheck() {
   )
 }
 
+/** El texto completo de todas las licencias (licencias.txt, que se genera al compilar). */
+function LicenseText() {
+  const [text, setText] = useState<string | null>(null)
+  const show = async () => {
+    try {
+      const res = await fetch('./licencias.txt')
+      setText(res.ok ? await res.text() : 'El archivo de licencias se genera al compilar la app (npm run build).')
+    } catch {
+      setText('No se pudo abrir el archivo de licencias.')
+    }
+  }
+  if (text === null)
+    return (
+      <button className="ghost-button small about-license-button" onClick={show}>
+        Ver el texto completo de las licencias
+      </button>
+    )
+  return <pre className="about-license-text">{text}</pre>
+}
+
 /** Quién hizo Mitzi, cómo contactarlo y con qué piezas de código abierto está hecha. */
 export function About({ onClose }: { onClose(): void }) {
   useBackHandler(true, onClose)
@@ -85,6 +105,16 @@ export function About({ onClose }: { onClose(): void }) {
         </div>
 
         <details className="about-credits">
+          <summary>Privacidad</summary>
+          <p className="sheet-note">
+            Mitzi no tiene cuentas ni anuncios y no recoge ningún dato: tus libros, tu avance, tus notas y tus estadísticas se
+            quedan en este dispositivo. Solo se conecta a internet para buscar actualizaciones (una vez al día, a GitHub) y
+            cuando tú pides definir o traducir algo (abre la RAE o DeepL con el texto que elegiste). Las voces naturales, si las
+            configuras, hablan con un servidor de tu propia PC.
+          </p>
+        </details>
+
+        <details className="about-credits">
           <summary>Créditos y licencias</summary>
           <p className="sheet-note">Mitzi es software libre con licencia MIT y usa estas piezas de código abierto:</p>
           <ul>
@@ -100,6 +130,7 @@ export function About({ onClose }: { onClose(): void }) {
               </li>
             ))}
           </ul>
+          <LicenseText />
         </details>
       </div>
     </div>
