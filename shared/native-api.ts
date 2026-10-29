@@ -49,7 +49,8 @@ export interface MitziNativeApi {
   syncStop(): Promise<void>
   /** La respuesta a un pedido que llegó por `onSyncIncoming` (ok = false: código equivocado). */
   syncReply(id: number, ok: boolean, body: string): Promise<void>
-  onSyncIncoming(cb: (id: number, body: string) => void): () => void
+  /** Llega un pedido; `remote` es la dirección de quien lo manda. */
+  onSyncIncoming(cb: (id: number, body: string, remote: string) => void): () => void
   syncRequest(hosts: string[], port: number, body: string): Promise<string>
   /** Pregunta en la red por PCs con Mitzi esperando. */
   syncDiscover(port: number): Promise<{ host: string; port: number; id: string }[]>

@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import qrcode from 'qrcode-generator'
 import { useAppSettings } from '../app/settings'
 import { platform } from '../platform'
-import { syncNow, useSyncClient } from '../sync/auto'
+import { setStatus as setPeerStatus, syncNow, useSyncClient } from '../sync/auto'
 import { formatCode } from '../sync/crypto'
-import { beginPairing, endPairing, unlinkGuest, useSyncHost } from '../sync/host'
+import { beginPairing, endPairing, initHost, unlinkPeer, useSyncHost } from '../sync/host'
 import { useLinks } from '../sync/links'
 import { describeResult, pairWith, parseManual, parseQr, qrText, SYNC_PORT, type SyncTarget } from '../sync/session'
 import { Toggle } from '../ui/controls'
@@ -36,104 +36,6 @@ const ago = (at: number) => {
   const h = Math.round(min / 60)
   if (h < 24) return `hace ${h} h`
   return new Date(at).toLocaleDateString('es', { day: 'numeric', month: 'long' })
-}
-
-/** La PC: sus equipos vinculados, el código para vincular otro y quedarse en la bandeja. */
-function HostCard() {
-  const guests = useLinks(s => s.guests)
-  const { listening, hosts, port, pairing, last, error } = useSyncHost()
-  const keepInTray = useAppSettings(s => s.keepInTray)
-  const setApp = useAppSettings(s => s.set)
-  const [asking, setAsking] = useState<string | null>(null)
-
-  return (
-    <section className="sync-card">
-      <h3>
-        <Icon name="wifi" size={18} /> Esta PC
-      </h3>
-      {guests.length > 0 ? (
-        <>
-          <p className="sheet-note">
-            {listening
-              ? 'Atenta a tus equipos: se sincronizan solos al abrir Mitzi, al volver a ella y al cerrar un libro, si están en la misma red Wi-Fi.'
-              : 'Abriendo…'}
-          </p>
-          <ul className="folder-list sync-links">
-            {guests.map(g => (
-              <li key={g.id}>
-                <span className="collection-name">
-                  <strong>{g.label}</strong>
-                  <small>{g.lastSync ? `Sincronizado ${ago(g.lastSync)}` : 'Vinculado'}</small>
-                </span>
-                <button
-                  className="ghost-button small settings-danger"
-                  data-state={asking === g.id ? 'ask' : 'idle'}
-                  onClick={() => (asking === g.id ? unlinkGuest(g.id) : setAsking(g.id))}
-                  onBlur={() => setAsking(null)}
-                >
-                  {asking === g.id ? '¿Desvincular?' : 'Desvincular'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        !pairing && (
-          <p className="sheet-note">
-            Vincula tu teléfono o tablet una sola vez: desde ahí se sincronizan solos cuando estén en la misma red Wi-Fi y Mitzi esté
-            abierta en esta PC.
-          </p>
-        )
-      )}
-
-      {pairing ? (
-        <>
-          <div className="sync-host">
-            <QrCode text={qrText({ hosts, port, code: pairing.code })} />
-            <div className="sync-manual">
-              <p className="sheet-note">En el teléfono o la tablet: Configuración › Sincronizar › Escanear código. O escribe:</p>
-              <dl>
-                <dt>Dirección</dt>
-                <dd>
-                  <code>
-                    {hosts[0] ?? '—'}
-                    {port !== SYNC_PORT ? `:${port}` : ''}
-                  </code>
-                </dd>
-                <dt>Código</dt>
-                <dd>
-                  <code className="sync-code">{formatCode(pairing.code)}</code>
-                </dd>
-              </dl>
-              {hosts.length > 1 && <p className="sync-hint">Si no conecta, prueba con: {hosts.slice(1).join(' · ')}</p>}
-            </div>
-          </div>
-          <p className="sync-hint">
-            Solo se escanea una vez por equipo. El código deja de servir a los 10 minutos. Si Windows pregunta, permite que Mitzi use las
-            redes privadas; si tu Wi-Fi está como «red pública» en Windows, el teléfono no podrá conectarse.
-          </p>
-          <button className="ghost-button small" onClick={endPairing}>
-            Cancelar
-          </button>
-        </>
-      ) : (
-        <div className="settings-actions">
-          <button className="read-button" onClick={() => void beginPairing()}>
-            <Icon name="plus" size={18} /> Vincular un equipo
-          </button>
-        </div>
-      )}
-      {error && <p className="sync-error">{error}</p>}
-      {last && <p className={last.ok ? 'sync-status' : 'sync-error'}>{last.text}</p>}
-
-      <Toggle
-        label="Mantener Mitzi en la bandeja al cerrar"
-        hint="Al cerrar la ventana, Mitzi sigue junto al reloj y tus equipos se pueden sincronizar"
-        checked={keepInTray}
-        onChange={v => setApp({ keepInTray: v })}
-      />
-    </section>
-  )
 }
 
 /** Cámara + jsQR: busca un código de Mitzi en lo que ve la cámara. */
@@ -211,36 +113,79 @@ function Scanner({ onFound, onCancel }: { onFound(target: SyncTarget): void; onC
   )
 }
 
-/** El teléfono o la tablet: vincularse con la PC (escaneando o escribiendo el código) o, si ya está, su estado. */
-function JoinCard() {
-  const host = useLinks(s => s.host)
-  const setHost = useLinks(s => s.setHost)
-  const { busy, last } = useSyncClient()
+/** Los equipos vinculados, con cuándo se sincronizó cada uno; y «Sincronizar ahora». */
+function PeersCard() {
+  const peers = useLinks(s => s.peers)
+  const { busy, status } = useSyncClient()
+  const [asking, setAsking] = useState<string | null>(null)
+  if (!peers.length) return null
+  return (
+    <section className="sync-card">
+      <h3>
+        <Icon name="sync" size={18} /> Tus equipos
+      </h3>
+      <ul className="folder-list sync-links">
+        {peers.map(p => {
+          const st = status[p.id]
+          return (
+            <li key={p.id}>
+              <span className="collection-name">
+                <strong>{p.label}</strong>
+                <small className={st && !st.ok ? 'sync-error' : undefined}>
+                  {st && !st.ok ? st.text : p.lastSync ? `Sincronizado ${ago(p.lastSync)}` : 'Vinculado'}
+                </small>
+              </span>
+              <button
+                className="ghost-button small settings-danger"
+                data-state={asking === p.id ? 'ask' : 'idle'}
+                onClick={() => (asking === p.id ? unlinkPeer(p.id) : setAsking(p.id))}
+                onBlur={() => setAsking(null)}
+              >
+                {asking === p.id ? '¿Desvincular?' : 'Desvincular'}
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <div className="settings-actions">
+        <button className="read-button" disabled={busy} onClick={() => void syncNow('manual')}>
+          <Icon name="sync" size={18} /> {busy ? 'Sincronizando…' : 'Sincronizar ahora'}
+        </button>
+      </div>
+    </section>
+  )
+}
+
+/** Vincular otro equipo: mostrar el código de este, o escanear (o escribir) el del otro. */
+function LinkCard() {
+  const { hosts, port, pairing, last, error } = useSyncHost()
   const [mode, setMode] = useState<'idle' | 'scan' | 'type'>('idle')
   const [address, setAddress] = useState('')
   const [code, setCode] = useState('')
-  const [pairing, setPairing] = useState(false)
+  const [linking, setLinking] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
-  const [asking, setAsking] = useState(false)
-  const canScan = !!navigator.mediaDevices?.getUserMedia
+  const canScan = !!navigator.mediaDevices?.getUserMedia && !!platform.syncRequest
 
   const run = async (target: SyncTarget) => {
     setMode('idle')
-    setPairing(true)
+    setLinking(true)
     setStatus({ ok: true, text: 'Vinculando…' })
     try {
       const done = await pairWith(target)
+      if (done.peerId) setPeerStatus(done.peerId, { ok: true, text: describeResult(done.result), at: Date.now() })
+      // ya hay un equipo vinculado: este también empieza a atender
+      initHost()
       setStatus({ ok: true, text: `Listo: vinculado con ${done.label}. ${describeResult(done.result)}` })
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e)
       setStatus({
         ok: false,
         text: /coincide/.test(message)
-          ? 'El código no coincide. Revísalo en la PC.'
-          : `No se pudo conectar con la PC (${message}). ¿Están en la misma red Wi-Fi y la PC muestra el código?`,
+          ? 'El código no coincide. Revísalo en el otro equipo.'
+          : `No se pudo conectar (${message}). ¿Están en la misma red Wi-Fi y el otro muestra su código?`,
       })
     } finally {
-      setPairing(false)
+      setLinking(false)
     }
   }
   const found = useRef(run)
@@ -248,112 +193,151 @@ function JoinCard() {
   const onFound = useMemo(() => (t: SyncTarget) => void found.current(t), [])
   const manual = parseManual(address, code)
 
-  if (host)
-    return (
-      <section className="sync-card">
-        <h3>
-          <Icon name="sync" size={18} /> Vinculado con {host.label}
-        </h3>
-        <p className="sheet-note">
-          Se sincroniza solo al abrir Mitzi, al volver a ella y al cerrar un libro, cuando los dos están en la misma red Wi-Fi y Mitzi
-          está abierta en la PC.
-        </p>
-        {host.lastSync && <p className="sync-hint">Última vez: {ago(host.lastSync)}.</p>}
-        {(status ?? last) && <p className={(status ?? last)!.ok ? 'sync-status' : 'sync-error'}>{(status ?? last)!.text}</p>}
-        <div className="settings-actions">
-          <button
-            className="read-button"
-            disabled={busy}
-            onClick={() => {
-              setStatus(null)
-              void syncNow('manual').catch(() => {})
-            }}
-          >
-            <Icon name="sync" size={18} /> {busy ? 'Sincronizando…' : 'Sincronizar ahora'}
-          </button>
-          <button
-            className="ghost-button small settings-danger"
-            data-state={asking ? 'ask' : 'idle'}
-            onClick={() => (asking ? setHost(null) : setAsking(true))}
-            onBlur={() => setAsking(false)}
-          >
-            {asking ? '¿Desvincular?' : 'Desvincular'}
-          </button>
-        </div>
-      </section>
-    )
-
   return (
     <section className="sync-card">
       <h3>
-        <Icon name="sync" size={18} /> Vincular con una PC
+        <Icon name="plus" size={18} /> Vincular otro equipo
       </h3>
-      <p className="sheet-note">
-        Una sola vez: en la PC abre Configuración › Sincronizar › Vincular un equipo, y escanea el código. Después se sincronizan solos.
-      </p>
-      {mode === 'scan' && <Scanner onFound={onFound} onCancel={() => setMode('idle')} />}
-      {mode === 'type' && (
-        <form
-          className="sync-form"
-          onSubmit={e => {
-            e.preventDefault()
-            if (manual) void run(manual)
-          }}
-        >
-          <label>
-            Dirección
-            <input value={address} onChange={e => setAddress(e.target.value)} placeholder="192.168.1.20" inputMode="decimal" spellCheck={false} />
-          </label>
-          <label>
-            Código
-            <input value={code} onChange={e => setCode(e.target.value)} placeholder="K7QM-3XPA" autoCapitalize="characters" spellCheck={false} />
-          </label>
-          <button className="read-button small" type="submit" disabled={!manual || pairing}>
-            Vincular
+      {pairing ? (
+        <>
+          <div className="sync-host">
+            <QrCode text={qrText({ hosts, port, code: pairing.code })} />
+            <div className="sync-manual">
+              <p className="sheet-note">En el otro equipo: Configuración › Sincronizar › Escanear código. O escribe:</p>
+              <dl>
+                <dt>Dirección</dt>
+                <dd>
+                  <code>
+                    {hosts[0] ?? '—'}
+                    {port !== SYNC_PORT ? `:${port}` : ''}
+                  </code>
+                </dd>
+                <dt>Código</dt>
+                <dd>
+                  <code className="sync-code">{formatCode(pairing.code)}</code>
+                </dd>
+              </dl>
+              {hosts.length > 1 && <p className="sync-hint">Si no conecta, prueba con: {hosts.slice(1).join(' · ')}</p>}
+            </div>
+          </div>
+          <p className="sync-hint">
+            Solo se escanea una vez por equipo y el código deja de servir a los 10 minutos.
+            {platform.kind === 'electron' &&
+              ' Si Windows pregunta, permite que Mitzi use las redes privadas; si tu Wi-Fi está como «red pública» en Windows, los otros equipos no podrán conectarse.'}
+          </p>
+          <button className="ghost-button small" onClick={endPairing}>
+            Cancelar
           </button>
-        </form>
-      )}
-      {mode === 'idle' && (
-        <div className="settings-actions">
-          {canScan && (
-            <button className="read-button" onClick={() => setMode('scan')} disabled={pairing}>
-              <Icon name="camera" size={18} /> Escanear código
-            </button>
+        </>
+      ) : (
+        <>
+          <p className="sheet-note">
+            Una sola vez por equipo: muestra el código en uno y escanéalo (o escríbelo) en el otro. Los dos deben estar en la misma red
+            Wi-Fi.
+          </p>
+          {mode === 'scan' && <Scanner onFound={onFound} onCancel={() => setMode('idle')} />}
+          {mode === 'type' && (
+            <form
+              className="sync-form"
+              onSubmit={e => {
+                e.preventDefault()
+                if (manual) void run(manual)
+              }}
+            >
+              <label>
+                Dirección
+                <input value={address} onChange={e => setAddress(e.target.value)} placeholder="192.168.1.20" inputMode="decimal" spellCheck={false} />
+              </label>
+              <label>
+                Código
+                <input value={code} onChange={e => setCode(e.target.value)} placeholder="K7QM-3XPA" autoCapitalize="characters" spellCheck={false} />
+              </label>
+              <button className="read-button small" type="submit" disabled={!manual || linking}>
+                Vincular
+              </button>
+            </form>
           )}
-          <button className="ghost-button" onClick={() => setMode('type')} disabled={pairing}>
-            Escribir el código
-          </button>
-        </div>
+          {mode === 'idle' && (
+            <div className="settings-actions">
+              {platform.syncServe && (
+                <button className="read-button" onClick={() => void beginPairing()} disabled={linking}>
+                  Mostrar mi código
+                </button>
+              )}
+              {canScan && (
+                <button className="ghost-button" onClick={() => setMode('scan')} disabled={linking}>
+                  <Icon name="camera" size={18} /> Escanear código
+                </button>
+              )}
+              {platform.syncRequest && (
+                <button className="ghost-button" onClick={() => setMode('type')} disabled={linking}>
+                  Escribir el código
+                </button>
+              )}
+            </div>
+          )}
+        </>
       )}
-      {status && <p className={status.ok ? 'sync-status' : 'sync-error'}>{status.text}</p>}
+      {error && <p className="sync-error">{error}</p>}
+      {(status ?? last) && <p className={(status ?? last)!.ok ? 'sync-status' : 'sync-error'}>{(status ?? last)!.text}</p>}
+    </section>
+  )
+}
+
+/** PC: quedarse en la bandeja. Android: seguir atenta en segundo plano (apagado de inicio). */
+function StayAwake() {
+  const keepInTray = useAppSettings(s => s.keepInTray)
+  const background = useAppSettings(s => s.backgroundSync)
+  const setApp = useAppSettings(s => s.set)
+  if (!platform.setTray && !platform.setBackgroundSync) return null
+  return (
+    <section className="sync-card">
+      {platform.setTray && (
+        <Toggle
+          label="Mantener Mitzi en la bandeja al cerrar"
+          hint="Al cerrar la ventana, Mitzi sigue junto al reloj y tus equipos se pueden sincronizar con esta PC"
+          checked={keepInTray}
+          onChange={v => setApp({ keepInTray: v })}
+        />
+      )}
+      {platform.setBackgroundSync && (
+        <>
+          <Toggle
+            label="Seguir atenta en segundo plano"
+            hint="Tus otros equipos se pueden sincronizar con este aunque Mitzi no esté a la vista. Deja un aviso fijo y gasta un poco más de batería"
+            checked={background}
+            onChange={v => setApp({ backgroundSync: v })}
+          />
+          {background && (
+            <p className="sync-hint">
+              Con la pantalla apagada, Android duerme el Wi-Fi y no siempre responde: se ponen al día al volver a usarlo. En Huawei,
+              además: Ajustes › Batería › Inicio de aplicaciones › Mitzi › Administrar manualmente, y activa «Ejecutar en segundo plano».
+            </p>
+          )}
+        </>
+      )}
     </section>
   )
 }
 
 /** En Configuración: vincular equipos y ver cómo va la sincronización. */
 export function SyncContent() {
-  const guests = useLinks(s => s.guests.length)
   return (
     <div className="sync">
       <p className="sheet-note">
         Pasa tu avance, subrayados, notas, marcadores, colecciones y estadísticas entre tus equipos, directo por tu Wi-Fi: sin cuentas
-        ni internet, y cifrado. La PC es el centro: el teléfono y la tablet se ponen al día a través de ella. Los libros no se copian;
-        cada uno se reconoce aunque esté en otra carpeta.
+        ni internet, y cifrado. Vincula cada equipo una vez; desde ahí se ponen al día solos al abrir Mitzi y al cerrar un libro, con
+        todos los que estén en la red con Mitzi abierta. Lo de uno pasa a los demás en cadena. Los libros no se copian.
       </p>
-      {platform.syncServe && <HostCard />}
-      {/* en la PC también se puede vincular con otra PC, pero casi nunca hace falta: va plegado */}
-      {platform.syncRequest &&
-        (platform.syncServe ? (
-          !guests && (
-            <details className="about-credits">
-              <summary>¿Esta PC con otra PC?</summary>
-              <JoinCard />
-            </details>
-          )
-        ) : (
-          <JoinCard />
-        ))}
-      {!platform.syncServe && !platform.syncRequest && <p className="sheet-note">En el navegador no se puede sincronizar.</p>}
+      {platform.syncServe || platform.syncRequest ? (
+        <>
+          <PeersCard />
+          <LinkCard />
+          <StayAwake />
+        </>
+      ) : (
+        <p className="sheet-note">En el navegador no se puede sincronizar.</p>
+      )}
     </div>
   )
 }

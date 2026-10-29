@@ -43,10 +43,13 @@ export function App() {
     const offView = useApp.subscribe((state, prev) => {
       if (prev.view.name === 'reader' && state.view.name === 'shelf') autoSync('libro')
     })
-    // en la PC: quedarse en la bandeja al cerrar, si se eligió
+    // en la PC: quedarse en la bandeja al cerrar; en Android: seguir atenta en segundo plano
+    // (con un aviso fijo). Las dos, solo si se eligieron
     platform.setTray?.(useAppSettings.getState().keepInTray)
+    if (useAppSettings.getState().backgroundSync) void platform.setBackgroundSync?.(true)
     const offTray = useAppSettings.subscribe((s, prev) => {
       if (s.keepInTray !== prev.keepInTray) platform.setTray?.(s.keepInTray)
+      if (s.backgroundSync !== prev.backgroundSync) void platform.setBackgroundSync?.(s.backgroundSync)
     })
     document.addEventListener('visibilitychange', onVisible)
     return () => {

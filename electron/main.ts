@@ -161,7 +161,7 @@ function registerIpc() {
   ipcMain.handle('image:copy', (_e, bytes: Uint8Array) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([Buffer.from(bytes)], { type: 'image/png' }) })]))
   // sincronizar por Wi-Fi: el servidor solo vive mientras la pantalla muestra el código
   ipcMain.handle('sync:start', (e, port: number, me: { id: string; label: string }) =>
-    syncServer.start(port, me, (id, body) => e.sender.send('sync:incoming', id, body)),
+    syncServer.start(port, me, (id, body, remote) => e.sender.send('sync:incoming', id, body, remote)),
   )
   ipcMain.handle('sync:reply', (_e, id: number, ok: boolean, body: string) => syncServer.reply(id, ok, body))
   ipcMain.handle('sync:stop', () => syncServer.stop())

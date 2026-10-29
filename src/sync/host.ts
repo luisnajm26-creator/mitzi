@@ -4,11 +4,13 @@ import { newCode, peek } from './crypto'
 import { deviceId, deviceLabel } from './device'
 import { useLinks } from './links'
 import { answerSync, describeResult, SYNC_PORT } from './session'
+import { setStatus } from './auto'
 
 /**
- * La PC como centro de la sincronización: mientras haya equipos vinculados, Mitzi los atiende
- * sola (aunque la ventana esté minimizada o en la bandeja). El código para vincular uno nuevo
- * solo vale mientras se muestra, 10 minutos como mucho y hasta 5 intentos equivocados.
+ * Atender a los equipos vinculados: mientras haya alguno, Mitzi espera que le hablen (la PC
+ * aunque esté minimizada o en la bandeja; Android mientras Mitzi esté abierta, o en segundo
+ * plano si se eligió). El código para vincular uno nuevo solo vale mientras se muestra, 10
+ * minutos como mucho y hasta 5 intentos equivocados.
  */
 const PAIRING_MS = 10 * 60_000
 const MAX_FAILURES = 5
@@ -29,14 +31,16 @@ export const useSyncHost = create<HostState>(() => ({ listening: false, hosts: [
 let failures = 0
 let pairingTimer: ReturnType<typeof setTimeout> | undefined
 
-async function handle(body: string) {
+async function handle(body: string, remote?: string) {
   const { pairing } = useSyncHost.getState()
   const code = pairing && pairing.until > Date.now() ? pairing.code : null
   try {
-    const done = await answerSync(body, code)
+    const done = await answerSync(body, code, remote)
     if (done.paired) endPairing()
     const text = done.paired ? `${done.label} quedó vinculado. ${describeResult(done.result)}` : `${done.label}: ${describeResult(done.result)}`
     useSyncHost.setState({ last: { ok: true, text, at: Date.now() } })
+    // el otro equipo acaba de hablar: si antes no se lo encontraba, ya no es cierto
+    if (done.peerId) setStatus(done.peerId, { ok: true, text: describeResult(done.result), at: Date.now() })
     return done.reply
   } catch (e) {
     // un código equivocado mientras se vincula: a los 5 intentos el código deja de valer
@@ -48,12 +52,12 @@ async function handle(body: string) {
   }
 }
 
-/** Abre el servidor (si no estaba abierto). */
+/** Empieza a atender (si no estaba atendiendo ya). */
 export async function startHost() {
   if (!platform.syncServe) return
   try {
     const { hosts, port } = await platform.syncServe(SYNC_PORT, { id: deviceId(), label: await deviceLabel() }, handle)
-    useSyncHost.setState({ listening: true, hosts, port, error: hosts.length ? null : 'Esta PC no está conectada a ninguna red' })
+    useSyncHost.setState({ listening: true, hosts, port, error: hosts.length ? null : 'Este equipo no está conectado a ninguna red' })
   } catch (e) {
     useSyncHost.setState({ listening: false, error: e instanceof Error ? e.message : String(e) })
   }
@@ -74,19 +78,19 @@ export async function beginPairing() {
   await startHost()
 }
 
-/** El código deja de valer; sin equipos vinculados, el servidor se cierra. */
+/** El código deja de valer; sin equipos vinculados, se deja de atender. */
 export function endPairing() {
   clearTimeout(pairingTimer)
   useSyncHost.setState({ pairing: null })
-  if (!useLinks.getState().guests.length) void stopHost()
+  if (!useLinks.getState().peers.length) void stopHost()
 }
 
-export function unlinkGuest(id: string) {
-  useLinks.getState().removeGuest(id)
-  if (!useLinks.getState().guests.length && !useSyncHost.getState().pairing) void stopHost()
+export function unlinkPeer(id: string) {
+  useLinks.getState().removePeer(id)
+  if (!useLinks.getState().peers.length && !useSyncHost.getState().pairing) void stopHost()
 }
 
-/** Al abrir la app: si hay equipos vinculados, se queda atenta a ellos. */
+/** Al abrir la app (o al vincular uno nuevo): si hay equipos vinculados, se queda atenta a ellos. */
 export function initHost() {
-  if (platform.syncServe && useLinks.getState().guests.length) void startHost()
+  if (platform.syncServe && useLinks.getState().peers.length) void startHost()
 }

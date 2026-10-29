@@ -76,13 +76,13 @@ function Home({ go }: { go(page: SettingsPage): void }) {
   const scanning = useLibrary(s => s.scanning)
   const count = useLibrary(s => s.books.length)
   const folderCount = folders?.folders.length ?? 0
-  const linkedHost = useLinks(s => s.host)
-  const guests = useLinks(s => s.guests)
-  const syncSub = linkedHost
-    ? `Vinculado con ${linkedHost.label}`
-    : guests.length
-      ? `${guests.length} ${guests.length === 1 ? 'equipo vinculado' : 'equipos vinculados'}`
-      : 'Tu avance y tus notas entre el teléfono y la PC, por Wi-Fi'
+  const peers = useLinks(s => s.peers)
+  const syncSub =
+    peers.length === 1
+      ? `Vinculado con ${peers[0].label}`
+      : peers.length
+        ? `${peers.length} equipos vinculados`
+        : 'Tu avance y tus notas entre tus equipos, por Wi-Fi'
 
   return (
     <>

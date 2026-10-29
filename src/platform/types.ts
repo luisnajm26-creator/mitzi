@@ -53,10 +53,14 @@ export interface Platform {
   onBackButton?(cb: () => void): () => void
   exitApp?(): void
   /**
-   * Espera sincronizaciones de otro dispositivo en la red local (PC). `onRequest` recibe lo que
+   * Espera sincronizaciones de otro dispositivo en la red local. `onRequest` recibe lo que
    * llegó y devuelve la respuesta; si lanza un error (código equivocado) se responde que no.
    */
-  syncServe?(port: number, me: { id: string; label: string }, onRequest: (body: string) => Promise<string>): Promise<{ hosts: string[]; port: number }>
+  syncServe?(
+    port: number,
+    me: { id: string; label: string },
+    onRequest: (body: string, remote?: string) => Promise<string>,
+  ): Promise<{ hosts: string[]; port: number }>
   syncStop?(): Promise<void>
   /** Manda una sincronización a otra PC de la red local; prueba cada dirección. */
   syncRequest?(hosts: string[], port: number, body: string): Promise<string>
@@ -66,6 +70,8 @@ export interface Platform {
   deviceLabel?(): Promise<string>
   /** Al cerrar la ventana, Mitzi queda en la bandeja del sistema (PC). */
   setTray?(on: boolean): void
+  /** Sigue atendiendo a los equipos vinculados en segundo plano, con un aviso fijo (Android). */
+  setBackgroundSync?(on: boolean): Promise<void>
 }
 
 /** Una PC con Mitzi que respondió en la red. */

@@ -46,7 +46,7 @@ export class SyncServer {
    * `onRequest` le pasa el pedido a la ventana; la respuesta vuelve por `reply()`. Si ya estaba
    * abierto, solo se cambia a quién se le pasan los pedidos (la ventana se recargó).
    */
-  async start(preferredPort: number, me: { id: string; label: string }, onRequest: (id: number, body: string) => void) {
+  async start(preferredPort: number, me: { id: string; label: string }, onRequest: (id: number, body: string, remote: string) => void) {
     this.onRequest = onRequest
     if (this.server && this.current) return { ...this.current, hosts: localAddresses() }
     const server = http.createServer((req, res) => {
@@ -74,7 +74,9 @@ export class SyncServer {
           }
           res.writeHead(403, { Connection: 'close' }).end()
         })
-        this.onRequest?.(id, Buffer.concat(chunks).toString('utf8'))
+        // la dirección sin el prefijo de IPv6 («::ffff:192.168.1.5»)
+        const remote = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '')
+        this.onRequest?.(id, Buffer.concat(chunks).toString('utf8'), remote)
       })
     })
     const port = await new Promise<number>((resolve, reject) => {
@@ -94,7 +96,7 @@ export class SyncServer {
     return this.current
   }
 
-  private onRequest: ((id: number, body: string) => void) | null = null
+  private onRequest: ((id: number, body: string, remote: string) => void) | null = null
 
   /** Responde a quien pregunte en la red por una PC con Mitzi (solo dice su id y su puerto). */
   private listenForSearches(port: number, me: { id: string; label: string }) {

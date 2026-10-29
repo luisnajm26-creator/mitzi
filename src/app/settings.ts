@@ -16,6 +16,8 @@ export interface AppSettings {
   autoUpdates: boolean
   /** (PC) al cerrar la ventana, Mitzi queda en la bandeja y sigue atendiendo a los equipos vinculados */
   keepInTray: boolean
+  /** (Android) seguir atendiendo a los equipos vinculados en segundo plano, con un aviso fijo */
+  backgroundSync: boolean
 }
 
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -24,6 +26,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   batterySaver: false,
   autoUpdates: true,
   keepInTray: false,
+  backgroundSync: false,
 }
 
 interface AppSettingsState extends AppSettings {

@@ -32,9 +32,9 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
     copyImage: async png => api.copyImage(new Uint8Array(await png.arrayBuffer())),
     async syncServe(port, me, onRequest) {
       offSync?.()
-      offSync = api.onSyncIncoming(async (id, body) => {
+      offSync = api.onSyncIncoming(async (id, body, remote) => {
         try {
-          await api.syncReply(id, true, await onRequest(body))
+          await api.syncReply(id, true, await onRequest(body, remote))
         } catch {
           await api.syncReply(id, false, '')
         }

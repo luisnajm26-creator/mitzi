@@ -52,30 +52,30 @@ Lo nuevo empieza a contar desde esta versión: «Lo que más leíste» y «Cuán
 | 29 | Configuración › Colecciones: **Renombrar** y **Borrar** | Cambia el nombre; borrar pide confirmar con un segundo toque |
 | 30 | Si el carrusel mostraba una colección que quedó vacía | Vuelve solo a mostrar todos los libros |
 
-## Sincronizar (vincular una vez y luego automático)
+## Sincronizar (todos tus equipos, vinculados una vez)
 
-Los equipos se **vinculan una sola vez** con el código de la PC. Desde ahí, el teléfono y la tablet se sincronizan solos con la PC al abrir Mitzi, al volver a ella y al cerrar un libro, si están en la **misma red Wi-Fi** y Mitzi está abierta en la PC (aunque sea minimizada o en la bandeja). La PC es el centro: lo que lees en la tablet llega al teléfono a través de ella. Se pasa el avance, los subrayados, las notas, los marcadores, las colecciones y las estadísticas; los libros no se copian.
+Todos los equipos son iguales: la PC, el teléfono y la tablet se vinculan entre sí **una sola vez** (uno muestra su código y el otro lo escanea o lo escribe). Desde ahí cada uno se pone al día solo, al abrir Mitzi, al volver a ella y al cerrar un libro, con todos los equipos vinculados que encuentre en la **misma red Wi-Fi** con Mitzi abierta. Lo de uno pasa a los demás en cadena. Se pasa el avance, los subrayados, las notas, los marcadores, las colecciones y las estadísticas; los libros no se copian.
 
 | # | Haz esto | Debe pasar |
 |---|---|---|
-| 31 | En la PC: Configuración › Sincronizar › **Vincular un equipo** | Aparece un código QR, la dirección (192.168…) y un código de 8 letras |
+| 31 | En la PC: Configuración › Sincronizar › **Mostrar mi código** | Aparece un código QR, la dirección (192.168…) y un código de 8 letras |
 | 32 | Si Windows pregunta por el firewall | Permite el acceso en **redes privadas** |
 | 33 | En el teléfono: Configuración › Sincronizar › **Escanear código** | La primera vez pide permiso de cámara; al apuntar al código dice «Listo: vinculado con (tu PC)» |
-| 34 | Mira la PC | En «Esta PC» aparece tu teléfono como equipo vinculado, y el código desaparece |
-| 35 | Vincula también la tablet (otra vez «Vincular un equipo», o **Escribir el código**) | Aparecen los dos equipos en la PC |
-| 36 | Lee unas páginas en la PC. Luego, en el teléfono, sal de Mitzi y vuelve a entrar (sin tocar Configuración) | Arriba aparece «Llegó lo último de (tu PC)» y el libro queda en la página donde lo dejaste en la PC |
-| 37 | Lee en la tablet y **cierra el libro** | La PC recibe el avance sola (al abrir ese libro en la PC sigue donde quedaste) |
-| 38 | Con un libro **abierto** en el teléfono, avanza ese libro en la PC; luego vuelve al teléfono | Aparece «Avanzaste en otro equipo (N %)» con **Ir allí**; al tocarlo salta a esa página. Con la ✕ te quedas donde estabas |
-| 39 | Tablet → PC → teléfono: lee en la tablet, cierra el libro, y abre Mitzi en el teléfono | El teléfono sigue donde quedaste en la tablet |
-| 40 | Subraya algo y agrega un marcador en el teléfono; ciérralo | Aparecen en la PC (y luego en la tablet) |
+| 34 | Mira los dos | En «Tus equipos» cada uno muestra al otro, y el código desaparece |
+| 35 | **Teléfono con tablet, sin la PC:** en la tablet, **Mostrar mi código**; en el teléfono, **Escanear código** | Quedan vinculados entre ellos (el teléfono ahora tiene dos equipos: la PC y la tablet) |
+| 36 | Lee unas páginas en la PC. Luego, en el teléfono, sal de Mitzi y vuelve a entrar (sin tocar Configuración) | Arriba aparece «Llegó lo último de (tu PC)» y el libro queda en la página donde lo dejaste |
+| 37 | Lee en la tablet y **cierra el libro** con Mitzi abierta en el teléfono | El teléfono recibe el avance (aunque la PC esté apagada) |
+| 38 | Con un libro **abierto** en el teléfono, avanza ese libro en otro equipo; luego vuelve al teléfono | Aparece «Avanzaste en otro equipo (N %)» con **Ir allí**; al tocarlo salta a esa página. Con la ✕ te quedas donde estabas |
+| 39 | Cadena: la tablet se sincroniza con la PC, y después el teléfono con la PC | El teléfono recibe también lo de la tablet |
+| 40 | Subraya algo y agrega un marcador en el teléfono; ciérralo | Aparecen en los otros equipos |
 | 41 | Borra una nota en un equipo | También se borra en los otros (no reaparece) |
 | 42 | Lee el mismo día en varios equipos | «Hoy» en Tu lectura suma lo de todos |
-| 43 | Configuración › Sincronizar en el teléfono: **Sincronizar ahora** | Dice «Sincronizado con (tu PC)» y lo que llegó |
-| 44 | Cierra Mitzi en la PC (sin bandeja) y abre Mitzi en el teléfono | No pasa nada molesto; en Configuración › Sincronizar dice que no encontró la PC. Al volver a abrir la PC y entrar a Mitzi, se pone al día |
-| 45 | En la PC enciende **Mantener Mitzi en la bandeja al cerrar** y cierra la ventana con la ✕ | Mitzi queda junto al reloj; el teléfono se sigue sincronizando. Clic en el ícono (o abrir Mitzi otra vez) muestra la ventana; **Salir** la cierra de verdad |
-| 46 | Reinicia el módem o cambia la PC de red, para que tenga otra dirección | El teléfono la encuentra solo y se sincroniza igual |
-| 47 | En la PC, **Desvincular** el teléfono | El teléfono ya no se sincroniza; en su Configuración dice que la PC ya no lo reconoce y que lo vuelvas a vincular |
-| 48 | Escribe un código equivocado al vincular | Dice «El código no coincide»; tras 5 intentos el código deja de servir |
+| 43 | Configuración › Sincronizar › **Sincronizar ahora** | En «Tus equipos» cada uno dice «Sincronizado hace un momento» o «No se encontró en la red» si está apagado o con Mitzi cerrada |
+| 44 | En el teléfono enciende **Seguir atenta en segundo plano** | Aparece un aviso fijo «Mitzi está atenta a tus equipos» (en Android 13+ pide permiso de avisos). Con Mitzi en segundo plano, e incluso con la pantalla apagada un rato, los otros equipos se sincronizan con él |
+| 45 | Apágalo | El aviso desaparece; ahora el teléfono solo atiende mientras Mitzi está abierta |
+| 46 | En la PC enciende **Mantener Mitzi en la bandeja al cerrar** y cierra la ventana con la ✕ | Mitzi queda junto al reloj y sigue atendiendo. Clic en el ícono (o abrir Mitzi otra vez) muestra la ventana; **Salir** la cierra de verdad |
+| 47 | Reinicia el módem para que los equipos cambien de dirección | Se encuentran solos y se sincronizan igual |
+| 48 | **Desvincular** un equipo en uno de los dos | Ya no se sincronizan; en el otro dice que ya no lo reconoce y que lo vuelvas a vincular. Escribir un código equivocado al vincular dice «El código no coincide», y tras 5 intentos el código deja de servir |
 
 ## README
 

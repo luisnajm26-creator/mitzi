@@ -19,6 +19,11 @@ interface MitziLibraryPlugin {
   syncRequest(options: { hosts: string[]; port: number; body: string }): Promise<{ body: string }>
   syncDiscover(options: { port: number }): Promise<{ peers: { host: string; port: number; id: string }[] }>
   deviceLabel(): Promise<{ label: string }>
+  syncServe(options: { port: number; id: string }): Promise<{ hosts: string[]; port: number }>
+  syncReply(options: { id: string; ok: boolean; body: string }): Promise<void>
+  syncStop(): Promise<void>
+  setBackgroundSync(options: { on: boolean }): Promise<void>
+  addListener(event: 'syncIncoming', cb: (e: { id: string; body: string; remote: string }) => void): Promise<PluginListenerHandle>
   addListener(event: 'libraryChanged', cb: () => void): Promise<PluginListenerHandle>
   addListener(event: 'updateProgress', cb: (e: { fraction: number }) => void): Promise<PluginListenerHandle>
 }
@@ -58,6 +63,7 @@ async function applySafeArea() {
 
 export function createAndroidPlatform(): Platform {
   let immersive = false
+  let offSync: (() => void) | null = null
   applySafeArea()
   // al girar la pantalla o mostrar u ocultar barras cambian los márgenes
   let resizeTimer: ReturnType<typeof setTimeout> | undefined
@@ -144,6 +150,27 @@ export function createAndroidPlatform(): Platform {
     syncRequest: async (hosts, port, body) => (await Library.syncRequest({ hosts, port, body })).body,
     syncDiscover: async () => (await Library.syncDiscover({ port: 47123 })).peers,
     deviceLabel: async () => (await Library.deviceLabel()).label,
+    // el teléfono y la tablet también atienden a sus equipos vinculados (el plugin abre un
+    // servidor mínimo y le pasa a la página cada pedido, que se une aquí como en la PC)
+    async syncServe(port, me, onRequest) {
+      offSync?.()
+      offSync = listen(() =>
+        Library.addListener('syncIncoming', async e => {
+          try {
+            await Library.syncReply({ id: e.id, ok: true, body: await onRequest(e.body, e.remote) })
+          } catch {
+            await Library.syncReply({ id: e.id, ok: false, body: '' })
+          }
+        }),
+      )
+      return Library.syncServe({ port, id: me.id })
+    },
+    async syncStop() {
+      offSync?.()
+      offSync = null
+      await Library.syncStop()
+    },
+    setBackgroundSync: on => Library.setBackgroundSync({ on }),
     onBackButton: cb => listen(() => App.addListener('backButton', cb)),
     exitApp: () => App.exitApp(),
   }

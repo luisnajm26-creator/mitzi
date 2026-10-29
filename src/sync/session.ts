@@ -2,14 +2,14 @@ import { platform } from '../platform'
 import { refreshLibrary } from '../library/store'
 import { cleanCode, newKey, open, peek, seal } from './crypto'
 import { deviceId, deviceLabel } from './device'
-import { useLinks } from './links'
+import { useLinks, type Link } from './links'
 import { mergeSnapshot, takeSnapshot, type MergeResult, type Snapshot } from './snapshot'
 
 /**
- * Sincronizar por Wi-Fi, sin cuentas ni internet. La primera vez el teléfono se vincula con el
- * código que muestra la PC; después se sincroniza solo, cifrando con la llave del vínculo.
- * Cada vez manda sus datos, la PC los une con los suyos y responde con todo junto, que el
- * teléfono también une: los dos quedan iguales.
+ * Sincronizar por Wi-Fi, sin cuentas ni internet. La primera vez dos equipos se vinculan con el
+ * código que muestra uno de ellos; después se sincronizan solos, cifrando con la llave del
+ * vínculo. Cada vez uno manda sus datos, el otro los une con los suyos y responde con todo junto,
+ * que el primero también une: los dos quedan iguales.
  */
 export const SYNC_PORT = 47123
 
@@ -25,6 +25,8 @@ export interface SyncOutcome {
   name: string
   /** cómo se llama («Pura 70 Ultra», «DESKTOP-LUIS») */
   label: string
+  /** su id (si es un equipo vinculado) */
+  peerId?: string
   result: MergeResult
 }
 
@@ -66,8 +68,8 @@ async function afterMerge(result: MergeResult) {
 export const isRejected = (e: unknown) => e instanceof Error && /coincide/.test(e.message)
 
 /**
- * Del lado del teléfono: se vincula con la PC usando su código (una sola vez) y de paso se
- * sincroniza. La PC responde con la llave del vínculo, que se usa desde entonces.
+ * Del lado que escanea: se vincula con el otro equipo usando su código (una sola vez) y de paso
+ * se sincroniza. El otro responde con la llave del vínculo, que se usa desde entonces.
  */
 export async function pairWith(target: SyncTarget): Promise<SyncOutcome> {
   if (!platform.syncRequest) throw new Error('Este dispositivo no puede sincronizar')
@@ -82,42 +84,43 @@ export async function pairWith(target: SyncTarget): Promise<SyncOutcome> {
   }
   if (response.link) {
     const now = Date.now()
-    useLinks.getState().setHost({ ...response.link, linkedAt: now, lastSync: now, hosts: target.hosts, port: target.port })
+    useLinks.getState().savePeer({ ...response.link, linkedAt: now, lastSync: now, hosts: target.hosts, port: target.port })
   }
   const result = await mergeSnapshot(response.snapshot)
   await afterMerge(result)
-  return { name: response.snapshot.name, label: response.link?.label ?? response.snapshot.name, result }
+  return { name: response.snapshot.name, label: response.link?.label ?? response.snapshot.name, peerId: response.link?.id, result }
 }
 
-/** Del lado del teléfono, ya vinculado: sin código, con la llave del vínculo. */
-export async function syncLinked(hosts: string[], port: number): Promise<SyncOutcome> {
-  const host = useLinks.getState().host
-  if (!host || !platform.syncRequest) throw new Error('No hay una PC vinculada')
-  const secret = { key: host.key, from: deviceId() }
+/** Con un equipo ya vinculado: sin código, con la llave del vínculo. */
+export async function syncPeer(peer: Link, hosts: string[], port: number): Promise<SyncOutcome> {
+  if (!platform.syncRequest) throw new Error('Este dispositivo no puede sincronizar')
+  const secret = { key: peer.key, from: deviceId() }
   const request: SyncRequest = { snapshot: await takeSnapshot(), link: { id: deviceId(), label: await deviceLabel() } }
   const reply = await platform.syncRequest(hosts, port, await seal(secret, 'pedido', request))
   const response = await open<SyncResponse>(secret, 'respuesta', reply)
   const result = await mergeSnapshot(response.snapshot)
-  useLinks.getState().touch(host.id, { hosts, port })
+  useLinks.getState().touch(peer.id, { hosts, port })
   await afterMerge(result)
-  return { name: response.snapshot.name, label: host.label, result }
+  return { name: response.snapshot.name, label: peer.label, peerId: peer.id, result }
 }
 
 /**
- * Del lado de la PC: abre lo que llegó y lo une con lo de aquí. Con el código (`pairingCode`,
+ * Del lado que atiende: abre lo que llegó y lo une con lo de aquí. Con el código (`pairingCode`,
  * solo mientras se muestra) vincula al equipo; si viene con la llave de un vínculo, lo reconoce.
- * Si no es ninguno de los dos, lanza un error y no se toca nada.
+ * Si no es ninguno de los dos, lanza un error y no se toca nada. `remote` es la dirección desde
+ * la que habló el otro: se guarda para buscarlo después.
  */
-export async function answerSync(body: string, pairingCode: string | null): Promise<{ reply: string; paired: boolean } & SyncOutcome> {
+export async function answerSync(body: string, pairingCode: string | null, remote?: string): Promise<{ reply: string; paired: boolean } & SyncOutcome> {
   const envelope = peek(body)
   const links = useLinks.getState()
+  const seen = remote ? { hosts: [remote], port: SYNC_PORT } : {}
   if (envelope.v === 1) {
     if (!pairingCode) throw new Error('No se está vinculando ningún equipo')
     const secret = { code: pairingCode }
     const request = await open<SyncRequest>(secret, 'pedido', body)
     const now = Date.now()
     const key = newKey()
-    if (request.link) links.saveGuest({ id: request.link.id, label: request.link.label, key, linkedAt: now, lastSync: now })
+    if (request.link) links.savePeer({ id: request.link.id, label: request.link.label, key, linkedAt: now, lastSync: now, ...seen })
     const result = await mergeSnapshot(request.snapshot)
     const response: SyncResponse = {
       snapshot: await takeSnapshot(),
@@ -125,17 +128,17 @@ export async function answerSync(body: string, pairingCode: string | null): Prom
     }
     const reply = await seal(secret, 'respuesta', response)
     await afterMerge(result)
-    return { reply, paired: !!request.link, name: request.snapshot.name, label: request.link?.label ?? request.snapshot.name, result }
+    return { reply, paired: !!request.link, name: request.snapshot.name, label: request.link?.label ?? request.snapshot.name, peerId: request.link?.id, result }
   }
-  const guest = links.guests.find(g => g.id === envelope.from)
-  if (!guest) throw new Error('Equipo no vinculado')
-  const request = await open<SyncRequest>({ key: guest.key, from: guest.id }, 'pedido', body)
+  const peer = links.peers.find(p => p.id === envelope.from)
+  if (!peer) throw new Error('Equipo no vinculado')
+  const request = await open<SyncRequest>({ key: peer.key, from: peer.id }, 'pedido', body)
   const result = await mergeSnapshot(request.snapshot)
   const response: SyncResponse = { snapshot: await takeSnapshot() }
-  const reply = await seal({ key: guest.key, from: deviceId() }, 'respuesta', response)
-  links.touch(guest.id, request.link ? { label: request.link.label } : {})
+  const reply = await seal({ key: peer.key, from: deviceId() }, 'respuesta', response)
+  links.touch(peer.id, { ...(request.link ? { label: request.link.label } : {}), ...seen })
   await afterMerge(result)
-  return { reply, paired: false, name: request.snapshot.name, label: request.link?.label ?? guest.label, result }
+  return { reply, paired: false, name: request.snapshot.name, label: request.link?.label ?? peer.label, peerId: peer.id, result }
 }
 
 /** «3 avances, 5 notas y 2 días de lectura» */

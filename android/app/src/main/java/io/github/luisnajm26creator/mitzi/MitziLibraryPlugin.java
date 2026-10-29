@@ -5,17 +5,21 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Build;
+import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract;
 import android.provider.Settings;
-import android.provider.DocumentsContract.Document;
 import android.view.Display;
 import android.view.HapticFeedbackConstants;
 import android.view.Window;
 import android.view.WindowManager;
 import androidx.activity.result.ActivityResult;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -32,16 +36,25 @@ import java.io.OutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.HttpURLConnection;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.NetworkInterface;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
 
 /**
@@ -556,6 +569,230 @@ public class MitziLibraryPlugin extends Plugin {
             i = start + size + 2;
         }
         return out.toByteArray();
+    }
+
+    // ---------- atender a los equipos vinculados ----------
+
+    /** Un pedido que llegó y espera la respuesta de la página (que es la que une los datos). */
+    private static class PendingSync {
+        final CountDownLatch done = new CountDownLatch(1);
+        volatile boolean ok;
+        volatile String body = "";
+    }
+
+    private final Map<String, PendingSync> pendingSync = new ConcurrentHashMap<>();
+    private ServerSocket syncServer;
+    private DatagramSocket syncFinder;
+    private WifiManager.MulticastLock multicastLock;
+    private int syncPort;
+
+    /**
+     * Abre un servidor HTTP mínimo para que los otros equipos vinculados le hablen a este, igual
+     * que a la PC. Cada pedido se le pasa a la página («syncIncoming»), que lo abre y lo une, y su
+     * respuesta («syncReply») se le devuelve al otro. También responde «¿dónde estás?» por UDP.
+     */
+    @PluginMethod
+    public void syncServe(PluginCall call) {
+        int port = call.getInt("port", 47123);
+        String myId = call.getString("id", "");
+        try {
+            if (syncServer == null || syncServer.isClosed()) {
+                ServerSocket server;
+                try {
+                    server = new ServerSocket();
+                    server.setReuseAddress(true);
+                    server.bind(new InetSocketAddress(port));
+                } catch (Exception busy) {
+                    // el puerto de siempre está ocupado: cualquiera libre (va en el código QR)
+                    server = new ServerSocket(0);
+                }
+                syncServer = server;
+                syncPort = server.getLocalPort();
+                final ServerSocket accepting = server;
+                new Thread(() -> acceptSync(accepting)).start();
+                startFinder(syncPort, myId);
+            }
+            JSObject result = new JSObject();
+            result.put("hosts", localAddresses());
+            result.put("port", syncPort);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("No se pudo abrir: " + e.getMessage());
+        }
+    }
+
+    @PluginMethod
+    public void syncReply(PluginCall call) {
+        PendingSync pending = pendingSync.get(call.getString("id", ""));
+        if (pending != null) {
+            pending.ok = Boolean.TRUE.equals(call.getBoolean("ok", false));
+            pending.body = call.getString("body", "");
+            pending.done.countDown();
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void syncStop(PluginCall call) {
+        stopSyncServer();
+        call.resolve();
+    }
+
+    private void stopSyncServer() {
+        try {
+            if (syncServer != null) syncServer.close();
+        } catch (Exception ignored) {
+            // ya estaba cerrado
+        }
+        syncServer = null;
+        if (syncFinder != null) syncFinder.close();
+        syncFinder = null;
+        if (multicastLock != null && multicastLock.isHeld()) multicastLock.release();
+        multicastLock = null;
+        for (PendingSync pending : pendingSync.values()) pending.done.countDown();
+    }
+
+    private void acceptSync(ServerSocket server) {
+        while (!server.isClosed()) {
+            try {
+                Socket socket = server.accept();
+                new Thread(() -> handleSync(socket)).start();
+            } catch (Exception e) {
+                return;
+            }
+        }
+    }
+
+    /** Lee un POST (encabezados y cuerpo según Content-Length), espera a la página y responde. */
+    private void handleSync(Socket accepted) {
+        try (Socket socket = accepted) {
+            socket.setSoTimeout(30000);
+            InputStream in = socket.getInputStream();
+            ByteArrayOutputStream head = new ByteArrayOutputStream();
+            int b;
+            int newlines = 0;
+            while ((b = in.read()) != -1) {
+                head.write(b);
+                // los encabezados terminan en \r\n\r\n
+                newlines = (b == '\n') ? newlines + 1 : (b == '\r' ? newlines : 0);
+                if (newlines == 2) break;
+                if (head.size() > 16384) return;
+            }
+            String headers = head.toString("US-ASCII");
+            int length = -1;
+            for (String line : headers.split("\r\n")) {
+                if (line.toLowerCase(Locale.ROOT).startsWith("content-length:")) length = Integer.parseInt(line.substring(15).trim());
+            }
+            OutputStream out = socket.getOutputStream();
+            if (!headers.startsWith("POST /mitzi-sync ") || length <= 0 || length > 64 * 1024 * 1024) {
+                out.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                return;
+            }
+            byte[] body = new byte[length];
+            int read = 0;
+            while (read < length) {
+                int n = in.read(body, read, length - read);
+                if (n < 0) return;
+                read += n;
+            }
+            String id = UUID.randomUUID().toString();
+            PendingSync pending = new PendingSync();
+            pendingSync.put(id, pending);
+            JSObject event = new JSObject();
+            event.put("id", id);
+            event.put("body", new String(body, StandardCharsets.UTF_8));
+            event.put("remote", socket.getInetAddress().getHostAddress());
+            notifyListeners("syncIncoming", event);
+            boolean answered = pending.done.await(60, TimeUnit.SECONDS);
+            pendingSync.remove(id);
+            if (answered && pending.ok) {
+                byte[] reply = pending.body.getBytes(StandardCharsets.UTF_8);
+                String top = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + reply.length + "\r\nConnection: close\r\n\r\n";
+                out.write(top.getBytes(StandardCharsets.US_ASCII));
+                out.write(reply);
+            } else {
+                out.write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+            }
+            out.flush();
+        } catch (Exception ignored) {
+            // el otro se fue a mitad: no pasa nada
+        }
+    }
+
+    /** Responde a quien pregunte en la red «¿dónde hay un equipo con Mitzi?» con su id y su puerto. */
+    private void startFinder(int port, String myId) {
+        try {
+            WifiManager wifi = (WifiManager) getContext().getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+            if (wifi != null) {
+                // sin esto, algunos teléfonos descartan los mensajes a toda la red
+                multicastLock = wifi.createMulticastLock("mitzi:buscar");
+                multicastLock.acquire();
+            }
+            DatagramSocket socket = new DatagramSocket(null);
+            socket.setReuseAddress(true);
+            socket.bind(new InetSocketAddress(port));
+            syncFinder = socket;
+            new Thread(() -> {
+                byte[] buffer = new byte[64];
+                while (!socket.isClosed()) {
+                    try {
+                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        socket.receive(packet);
+                        String text = new String(packet.getData(), 0, packet.getLength(), StandardCharsets.UTF_8);
+                        if (!text.equals("MITZI?")) continue;
+                        JSObject info = new JSObject();
+                        info.put("id", myId);
+                        info.put("port", port);
+                        byte[] answer = ("MITZI!" + info.toString()).getBytes(StandardCharsets.UTF_8);
+                        socket.send(new DatagramPacket(answer, answer.length, packet.getAddress(), packet.getPort()));
+                    } catch (Exception e) {
+                        if (socket.isClosed()) return;
+                    }
+                }
+            }).start();
+        } catch (Exception e) {
+            // sin búsqueda: las direcciones guardadas bastan casi siempre
+        }
+    }
+
+    /** Las direcciones IPv4 de este equipo en la red local (Wi-Fi). */
+    private static JSArray localAddresses() {
+        JSArray out = new JSArray();
+        try {
+            for (NetworkInterface net : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!net.isUp() || net.isLoopback()) continue;
+                for (InetAddress address : Collections.list(net.getInetAddresses())) {
+                    if (address instanceof Inet4Address && address.isSiteLocalAddress()) out.put(address.getHostAddress());
+                }
+            }
+        } catch (Exception ignored) {
+            // sin red
+        }
+        return out;
+    }
+
+    /** «Seguir atenta en segundo plano» (apagado de inicio): el servicio con aviso fijo. */
+    @PluginMethod
+    public void setBackgroundSync(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        Intent service = new Intent(getContext(), SyncKeepAlive.class);
+        if (on) {
+            // Android 13+: para que se vea el aviso hay que pedir permiso (sin él, igual funciona)
+            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(getContext(), "android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(getActivity(), new String[] { "android.permission.POST_NOTIFICATIONS" }, 7);
+            }
+            ContextCompat.startForegroundService(getContext(), service);
+        } else {
+            getContext().stopService(service);
+        }
+        call.resolve();
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        stopSyncServer();
+        getContext().stopService(new Intent(getContext(), SyncKeepAlive.class));
+        super.handleOnDestroy();
     }
 
     // ---------- actualizaciones ----------
