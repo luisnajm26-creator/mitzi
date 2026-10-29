@@ -1,3 +1,9 @@
+/* cursor escondido tras unos segundos quieto (ver CURSOR_IDLE_MS en Reader.tsx) */
+.reader[data-cursor='hidden'],
+.reader[data-cursor='hidden'] * {
+  cursor: none !important;
+}
+
 .reader {
   position: fixed;
   inset: 0;

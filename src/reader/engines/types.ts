@@ -122,6 +122,8 @@ export interface ReaderEngine {
   /** Dibuja los subrayados del libro (se llama de nuevo cuando cambian). */
   setAnnotations(list: AnnotationRecord[], theme: ThemeColors): void
   clearSelection(): void
+  /** Oculta el cursor también dentro del libro (el EPUB vive en iframes con su propio cursor). */
+  setCursorHidden?(hidden: boolean): void
   /** Dónde empieza lo que se ve ahora (para un marcador) y un fragmento de su texto. */
   bookmarkHere(): { location: string; excerpt: string } | null
   /** ¿Esa posición guardada está en lo que se ve ahora? */

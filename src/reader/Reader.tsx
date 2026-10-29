@@ -24,6 +24,9 @@ import type { AnnotationRecord, BookmarkRecord, HighlightColor } from '../librar
 import type { PointerInfo, TextSelection } from './engines/types'
 import './reader.css'
 
+/** Tiempo sin mover el ratón para esconder el cursor. */
+const CURSOR_IDLE_MS = 2500
+
 type Panel = null | 'toc' | 'comfort' | 'notes' | 'search'
 
 export default function Reader({ bookId }: { bookId: string }) {
@@ -82,6 +85,14 @@ export default function Reader({ bookId }: { bookId: string }) {
   const brightnessGesture = useRef<{ y: number; start: number; value: number } | null>(null)
   const [selection, setSelection] = useState<TextSelection | null>(null)
   const [tapped, setTapped] = useState<{ id: string; rect: DOMRect } | null>(null)
+  // en la PC el cursor se esconde tras unos segundos quieto, para que no distraiga al leer
+  const [cursorIdle, setCursorIdle] = useState(false)
+  const cursorTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const wakeCursor = useCallback(() => {
+    setCursorIdle(false)
+    clearTimeout(cursorTimer.current)
+    cursorTimer.current = setTimeout(() => setCursorIdle(true), CURSOR_IDLE_MS)
+  }, [])
   /** texto de la cita que se está convirtiendo en tarjeta para compartir */
   const [sharing, setSharing] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -173,6 +184,8 @@ export default function Reader({ bookId }: { bookId: string }) {
    * deslizando a un lado en cualquier parte. Al soltar termina de girar o vuelve.
    */
   const onPointer = (e: PointerInfo): boolean => {
+    // el ratón se mueve dentro del libro (iframe): el cursor vuelve a verse
+    if (e.pointerType === 'mouse') wakeCursor()
     // brillo: deslizar arriba o abajo desde el borde izquierdo (teléfono y tablet)
     if (e.pointerType === 'touch') {
       const b = brightnessGesture.current
@@ -384,6 +397,21 @@ export default function Reader({ bookId }: { bookId: string }) {
 
   const tappedRef = useRef(tapped)
   tappedRef.current = tapped
+
+  // el cursor: lo despiertan los movimientos fuera del libro (barras, PDF); dentro del EPUB, onPointer.
+  // Con un panel, un menú o una nota abiertos no se esconde: ahí se está usando el ratón
+  useEffect(() => {
+    window.addEventListener('mousemove', wakeCursor)
+    wakeCursor()
+    return () => {
+      window.removeEventListener('mousemove', wakeCursor)
+      clearTimeout(cursorTimer.current)
+    }
+  }, [wakeCursor])
+  const hideCursor = cursorIdle && !panel && !selection && !tapped && !sharing && !editing
+  useEffect(() => {
+    engineRef.current?.setCursorHidden?.(hideCursor)
+  }, [hideCursor, status])
 
   // al abrir un panel se cierran los menús flotantes
   useEffect(() => {
@@ -605,7 +633,7 @@ export default function Reader({ bookId }: { bookId: string }) {
   const showChrome = chrome || panel !== null || status !== 'ready'
 
   return (
-    <div ref={rootRef} className="reader" data-dark={theme.dark} data-chrome={showChrome} data-leaving={leaving} data-book={!!bookGeo} style={vars}>
+    <div ref={rootRef} className="reader" data-dark={theme.dark} data-chrome={showChrome} data-leaving={leaving} data-book={!!bookGeo} data-cursor={hideCursor ? 'hidden' : undefined} style={vars}>
       {bookGeo && book && <OpenBookBase geo={bookGeo} progress={fraction} palette={book.palette} theme={theme} />}
       <div className="reader-stage" ref={stageRef} style={stageStyle} />
       <div className="flip-under" ref={flipUnderRef} aria-hidden />

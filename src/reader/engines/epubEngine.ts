@@ -295,6 +295,13 @@ export class EpubEngine implements ReaderEngine {
     this.#drawAll()
   }
 
+  #cursorHidden = false
+
+  setCursorHidden(hidden: boolean) {
+    this.#cursorHidden = hidden
+    for (const { doc } of this.#view?.renderer.getContents() ?? []) doc.documentElement.style.cursor = hidden ? 'none' : ''
+  }
+
   clearSelection() {
     this.#hadSelection = false
     for (const { doc } of this.#view?.renderer.getContents() ?? []) doc.getSelection()?.removeAllRanges()
@@ -370,6 +377,7 @@ export class EpubEngine implements ReaderEngine {
     // del índice (los libros suelen partir un capítulo en varios archivos)
     doc.documentElement.classList.toggle('mitzi-chapter', this.#chapterEnds.has(index) && (doc.body?.textContent?.trim().length ?? 0) > 200)
     setupPlate(doc)
+    if (this.#cursorHidden) doc.documentElement.style.cursor = 'none'
     doc.addEventListener('keydown', e => this.#callbacks.onKey(e))
     // selección de texto para subrayar (con ratón, teclado o las manijas de Android)
     const checkSelection = () => {
