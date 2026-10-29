@@ -166,6 +166,7 @@ Hola, soy **Luis A.** Hice Mitzi por puro gusto personal, a raíz de mi afición
 - [pdf.js](https://github.com/mozilla/pdf.js) (Apache-2.0): motor de PDF
 - [three.js](https://threejs.org) y [react-three-fiber](https://github.com/pmndrs/react-three-fiber) (MIT): carrusel 3D
 - [hyphen](https://github.com/ytiurin/hyphen) (ISC): separación silábica
+- [RPG Audio de Kenney](https://kenney.nl/assets/rpg-audio) (CC0): sonido de hoja al pasar página
 - Tipografías Literata, Merriweather, Atkinson Hyperlegible Next, Nunito y OpenDyslexic (SIL Open Font License) vía [Fontsource](https://fontsource.org)
 
 </details>

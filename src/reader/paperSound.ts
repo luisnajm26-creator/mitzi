@@ -1,44 +1,51 @@
 /**
- * Roce de papel al pasar página, sintetizado con Web Audio (ruido filtrado que sube de
- * tono y se apaga): no hace falta ningún archivo de audio ni su licencia.
+ * Sonido de hoja al pasar página: grabaciones reales (public/sounds/, de Kenney, CC0).
+ * Se elige una al azar en cada giro, con un tono apenas distinto, para que no suene repetitivo.
+ * Se decodifican una sola vez con Web Audio: así suenan al instante, sin el retraso de <audio>.
  */
-let ctx: AudioContext | null = null
-let noise: AudioBuffer | null = null
+const FILES = ['hoja-1.ogg', 'hoja-2.ogg', 'hoja-3.ogg']
 
-function noiseBuffer(context: AudioContext) {
-  const length = Math.floor(context.sampleRate * 0.5)
-  const buffer = context.createBuffer(1, length, context.sampleRate)
-  const data = buffer.getChannelData(0)
-  // ruido «marrón» (más grave que el blanco) con un poco de blanco: suena a hoja, no a radio
-  let last = 0
-  for (let i = 0; i < length; i++) {
-    const white = Math.random() * 2 - 1
-    last = (last + 0.02 * white) / 1.02
-    data[i] = last * 3.5 + white * 0.15
-  }
-  return buffer
+let ctx: AudioContext | null = null
+let buffers: Promise<AudioBuffer[]> | null = null
+let last = -1
+
+function load(context: AudioContext) {
+  buffers ??= Promise.all(
+    FILES.map(async name => {
+      const res = await fetch(new URL(`sounds/${name}`, document.baseURI))
+      return context.decodeAudioData(await res.arrayBuffer())
+    }),
+  ).catch(() => [])
+  return buffers
 }
 
-export function playPaperSound() {
+/** Carga los sonidos con tiempo (al abrir el lector), para que el primer giro ya suene. */
+export function preparePaperSound() {
+  try {
+    ctx ??= new AudioContext()
+    void load(ctx)
+  } catch {
+    // sin audio disponible
+  }
+}
+
+export async function playPaperSound() {
   try {
     ctx ??= new AudioContext()
     if (ctx.state === 'suspended') void ctx.resume()
-    noise ??= noiseBuffer(ctx)
-    const t = ctx.currentTime
+    const list = await load(ctx)
+    if (!list.length) return
+    // nunca la misma dos veces seguidas
+    let i = Math.floor(Math.random() * list.length)
+    if (list.length > 1 && i === last) i = (i + 1) % list.length
+    last = i
     const source = ctx.createBufferSource()
-    source.buffer = noise
-    const band = ctx.createBiquadFilter()
-    band.type = 'bandpass'
-    band.Q.value = 0.8
-    band.frequency.setValueAtTime(1100, t)
-    band.frequency.exponentialRampToValueAtTime(3600, t + 0.3)
+    source.buffer = list[i]
+    source.playbackRate.value = 0.94 + Math.random() * 0.12
     const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0.0001, t)
-    gain.gain.exponentialRampToValueAtTime(0.16, t + 0.05)
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.42)
-    source.connect(band).connect(gain).connect(ctx.destination)
-    source.start(t)
-    source.stop(t + 0.45)
+    gain.gain.value = 0.55
+    source.connect(gain).connect(ctx.destination)
+    source.start()
   } catch {
     // sin audio disponible: no pasa nada
   }

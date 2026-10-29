@@ -45,7 +45,7 @@ src/
   shelf/              Shelf (biblioteca), Shelf3D + textures + LightRig + carousel (three.js),
                       Explorer (buscador), AmbientBackground, About, StatsPanel, UpdateToast
   reader/             Reader.tsx (pantalla de lectura, gestos, barras, paneles), SearchPanel, pace.ts
-                      (tiempo que falta), lookup.ts (definir/traducir), paperSound.ts
+                      (tiempo que falta), lookup.ts (definir/traducir), paperSound.ts (hojas grabadas de public/sounds, CC0)
     engines/          ReaderEngine: epubEngine (foliate-js), pdfEngine + pdfjs.ts, plates.ts (láminas),
                       hyphenate.ts (guiones suaves)
     pageTurn/         PageFlip (hoja que gira), geometry (doblez), epubGhost (copias del capítulo)

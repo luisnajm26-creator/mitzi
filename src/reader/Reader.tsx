@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { formatMinutes, paceFactor, resetPaceSession, trackPace } from './pace'
 import { SearchPanel } from './SearchPanel'
-import { playPaperSound } from './paperSound'
+import { playPaperSound, preparePaperSound } from './paperSound'
 import { dayKey, flushStats, notePageTurn, startReadingSession, todayMinutes } from '../library/stats'
 import { isReflowable } from '../library/formats'
 import { useApp } from '../app/store'
@@ -408,6 +408,11 @@ export default function Reader({ bookId }: { bookId: string }) {
       clearTimeout(cursorTimer.current)
     }
   }, [wakeCursor])
+  // sonido de hoja: se carga al abrir el lector para que el primer giro ya suene
+  useEffect(() => {
+    if (settings.pageSound) preparePaperSound()
+  }, [settings.pageSound])
+
   const hideCursor = cursorIdle && !panel && !selection && !tapped && !sharing && !editing
   useEffect(() => {
     engineRef.current?.setCursorHidden?.(hideCursor)
@@ -468,7 +473,9 @@ export default function Reader({ bookId }: { bookId: string }) {
     if (flipUnderRef.current && flipOverRef.current) {
       const flip = new PageFlip(flipUnderRef.current, flipOverRef.current)
       // tras cada giro, las copias del capítulo se preparan para el siguiente
-      flip.onStart = () => latest.current.settings.pageSound && playPaperSound()
+      flip.onStart = () => {
+        if (latest.current.settings.pageSound) void playPaperSound()
+      }
       flip.onFinish = turned => {
         // una vibración muy leve cuando la hoja cae (teléfono)
         if (turned && latest.current.settings.haptics) platform.haptic?.()

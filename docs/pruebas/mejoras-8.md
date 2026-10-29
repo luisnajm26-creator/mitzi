@@ -13,3 +13,16 @@ Al reportar algo, anota: **número de prueba, qué hiciste, qué esperabas, qué
 | 5 | Abre **Aa** (Lectura cómoda) o el índice y deja el ratón quieto encima | El cursor **no** se esconde mientras hay un panel abierto |
 | 6 | Selecciona texto y deja el ratón quieto con el menú de colores abierto | El cursor no se esconde mientras está el menú |
 | 7 | Vuelve a la biblioteca | El cursor funciona normal (en la biblioteca no se esconde) |
+
+## Sonido de hoja real
+
+El sonido al pasar página ahora es una grabación real de una hoja (tres variantes de Kenney, licencia CC0), elegida al azar en cada giro y con el tono apenas distinto para que no suene repetitivo.
+
+| # | Haz esto | Debe pasar |
+|---|---|---|
+| 8 | En **Aa** › Sonido de papel, enciéndelo | Suena una hoja al momento, para que sepas cómo se oye |
+| 9 | Pasa varias páginas seguidas | Cada giro suena a una hoja de papel, y no siempre igual |
+| 10 | Pásalas rápido | No se traba ni se acumula ruido |
+| 11 | Apágalo | Las páginas giran en silencio |
+| 12 | En el teléfono (Mitzi Prueba), con el volumen de medios arriba | Igual que en la PC |
+| 13 | En **Acerca de › Créditos y licencias** | Aparece «Kenney · RPG Audio» (CC0) |

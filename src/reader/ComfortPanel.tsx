@@ -6,6 +6,7 @@ import { effectiveSettings, useReaderSettings, type ComfortSettings } from './co
 import { CUSTOM_THEME_ID, THEMES, type ThemePreset } from './comfort/themes'
 import { Section, Segment, Slider, Stepper, Toggle } from './controls'
 import { VoiceServerSection } from './tts/VoiceServer'
+import { playPaperSound } from './paperSound'
 
 const GROUPS: { id: ThemePreset['group']; label: string }[] = [
   { id: 'claros', label: 'Claros' },
@@ -141,7 +142,16 @@ export function ComfortPanel({ bookId, format, onClose }: Props) {
           checked={s.animatePages}
           onChange={v => set({ animatePages: v })}
         />
-        <Toggle label="Sonido de papel" hint="Un roce suave al pasar página" checked={s.pageSound} onChange={v => set({ pageSound: v })} />
+        <Toggle
+          label="Sonido de papel"
+          hint="Una hoja real al pasar página"
+          checked={s.pageSound}
+          onChange={v => {
+            set({ pageSound: v })
+            // al encenderlo suena una vez, para saber cómo se oye
+            if (v) void playPaperSound()
+          }}
+        />
         {platform.kind === 'android' && (
           <Toggle label="Vibración al pasar página" hint="Un toque muy leve" checked={s.haptics} onChange={v => set({ haptics: v })} />
         )}
