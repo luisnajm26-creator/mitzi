@@ -61,20 +61,22 @@ Lector de libros electrónicos y cómics para **Android** y **Windows**. Gratis,
 **✍️ Herramientas**
 - Marcadores, subrayados en 5 colores y notas, con exportación a Markdown.
 - Búsqueda dentro del libro, y definir o traducir lo que seleccionas.
-- **Tu lectura:** minutos por semana, mes y año, calendario de días leídos, rachas, a qué hora lees, los libros que más leíste y una meta diaria.
+- **Tu lectura:** minutos por semana, mes y año, calendario de días leídos, rachas, a qué hora lees, los libros que más leíste y una meta diaria. Y puedes compartir **Mi semana** o **Mi mes** como tarjeta para tus historias.
 
 **🎧 Voz**
 - Lectura en voz alta que resalta la oración y pasa de página sola, con temporizador para dormir.
 - En la PC, voces naturales con un servidor de voz local como [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI).
 
 **🔄 Sincronizar sin cuentas**
-- Vinculas tu teléfono o tablet con la PC escaneando un código QR, una sola vez. Desde ahí tu avance, subrayados, notas, marcadores, colecciones y estadísticas se ponen al día solos al abrir Mitzi y al cerrar un libro. Va directo por tu Wi-Fi, cifrado, sin internet ni servidores de nadie.
+- Vinculas tus equipos (PC, teléfono, tablet) escaneando un código QR, una sola vez. Desde ahí tu avance, subrayados, notas, marcadores, colecciones y estadísticas se ponen al día solos al abrir Mitzi y al cerrar un libro, con todos los que estén en tu red.
+- Si un libro que tienes abierto avanzó en otro equipo, Mitzi te ofrece ir a esa página.
+- Va directo por tu Wi-Fi y cifrado: sin internet, sin cuentas y sin servidores de nadie.
 
 **💬 Compartir citas**
 
 <img align="right" src="docs/capturas/cita.webp" width="200" alt="Tarjeta de una cita lista para historias" />
 
-Seleccionas un fragmento y Mitzi lo convierte en una tarjeta para tus historias o publicaciones, con la letra con la que lees y 4 diseños. En Android va directo al menú de compartir; en la PC se guarda o se copia.
+Seleccionas un fragmento y Mitzi lo convierte en una tarjeta para tus historias o publicaciones, con la letra con la que lees y 4 diseños. También tus estadísticas de la semana o del mes. En Android va directo al menú de compartir; en la PC se guarda o se copia.
 
 <br clear="right" />
 
@@ -82,7 +84,11 @@ Seleccionas un fragmento y Mitzi lo convierte en una tarjeta para tus historias 
 - Probada en Huawei con EMUI (sin servicios de Google) y en navegadores internos viejos.
 - Pantalla completa de verdad, gesto atrás y 120 Hz durante las animaciones.
 - Se actualiza desde la misma app, comprobando la huella de cada descarga.
-- Configuración en un solo lugar: carpetas, colecciones, giro y polvo de la biblioteca, ahorro de batería, sonido, actualizaciones y tus datos.
+- Configuración en un solo lugar: carpetas, colecciones, sincronizar, giro y polvo de la biblioteca, ahorro de batería, sonido, actualizaciones y tus datos.
+
+**🔒 Privada y segura**
+- Sin cuentas, sin anuncios y sin recoger datos: todo se queda en tus equipos.
+- Los libros no pueden ejecutar código dentro de Mitzi, y la sincronización va cifrada de punta a punta. Detalles en [SECURITY.md](SECURITY.md).
 
 ## Descargar
 
