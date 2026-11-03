@@ -16,6 +16,33 @@ const MAX_BODY = 16 * 1024 * 1024
 const MAX_CONNECTIONS = 6
 const ASK = 'MITZI?'
 const ANSWER = 'MITZI!'
+/** Pedidos rechazados desde una misma dirección antes de bloquearla un rato (no hay quién se equivoque tanto). */
+const STRIKES = 10
+const STRIKE_WINDOW_MS = 10 * 60_000
+const BLOCK_MS = 10 * 60_000
+
+/**
+ * La versión del sobre (1: con el código de vincular; 2: con la llave de un vínculo), o 0 si no
+ * tiene la forma de un sobre de src/sync/crypto.ts. Se revisa aquí, antes de pasarlo a la
+ * ventana: lo que no lo sea ni siquiera llega a abrirse.
+ */
+export function envelopeVersion(body: string): 0 | 1 | 2 {
+  let e: unknown
+  try {
+    e = JSON.parse(body)
+  } catch {
+    return 0
+  }
+  if (!e || typeof e !== 'object' || Array.isArray(e)) return 0
+  const o = e as Record<string, unknown>
+  if (Object.keys(o).some(k => !['v', 'iv', 'data', 'from'].includes(k))) return 0
+  if (o.v !== 1 && o.v !== 2) return 0
+  // iv: 12 bytes en base64; data: base64; from (solo v2): el id del equipo, un UUID
+  if (typeof o.iv !== 'string' || !/^[A-Za-z0-9+/]{16}$/.test(o.iv)) return 0
+  if (typeof o.data !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(o.data)) return 0
+  if (o.v === 2 ? typeof o.from !== 'string' || !/^[0-9a-f-]{36}$/i.test(o.from) : 'from' in o) return 0
+  return o.v
+}
 
 type Reply = (ok: boolean, body: string) => void
 
@@ -40,6 +67,23 @@ export class SyncServer {
   private nextId = 1
   private finder: dgram.Socket | null = null
   private current: { hosts: string[]; port: number } | null = null
+  /** pedidos rechazados por dirección: a los STRIKES se bloquea esa dirección un rato */
+  private strikes = new Map<string, { count: number; since: number; blockedUntil: number }>()
+
+  private isBlocked(remote: string) {
+    return (this.strikes.get(remote)?.blockedUntil ?? 0) > Date.now()
+  }
+
+  private strike(remote: string) {
+    const now = Date.now()
+    let s = this.strikes.get(remote)
+    if (!s || now - s.since > STRIKE_WINDOW_MS) s = { count: 0, since: now, blockedUntil: 0 }
+    if (++s.count >= STRIKES) s.blockedUntil = now + BLOCK_MS
+    this.strikes.set(remote, s)
+    // que la lista no crezca sin fin si alguien prueba desde muchas direcciones
+    if (this.strikes.size > 500)
+      for (const [ip, st] of this.strikes) if (now - st.since > STRIKE_WINDOW_MS && st.blockedUntil < now) this.strikes.delete(ip)
+  }
 
   get running() {
     return !!this.server
@@ -57,6 +101,18 @@ export class SyncServer {
         res.writeHead(404).end()
         return
       }
+      // la dirección sin el prefijo de IPv6 («::ffff:192.168.1.5»)
+      const remote = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '')
+      if (this.isBlocked(remote)) {
+        res.writeHead(429, { Connection: 'close' }).end()
+        req.destroy()
+        return
+      }
+      if (!(req.headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) {
+        this.strike(remote)
+        res.writeHead(415, { Connection: 'close' }).end()
+        return
+      }
       const chunks: Buffer[] = []
       let size = 0
       req.on('data', (chunk: Buffer) => {
@@ -66,6 +122,13 @@ export class SyncServer {
         else chunks.push(chunk)
       })
       req.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8')
+        const version = envelopeVersion(body)
+        if (!version) {
+          this.strike(remote)
+          res.writeHead(400, { Connection: 'close' }).end()
+          return
+        }
         const id = this.nextId++
         const timeout = setTimeout(() => this.reply(id, false, 'sin respuesta'), 60_000)
         this.pending.set(id, (ok, body) => {
@@ -76,11 +139,13 @@ export class SyncServer {
             res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), Connection: 'close' }).end(body)
             return
           }
+          // un código de vincular equivocado cuenta; una llave de vínculo rechazada no: es imposible de
+          // adivinar, y casi siempre es un equipo que desvinculaste y sigue intentando (así no
+          // queda bloqueado si lo vuelves a vincular enseguida)
+          if (version === 1) this.strike(remote)
           res.writeHead(403, { Connection: 'close' }).end()
         })
-        // la dirección sin el prefijo de IPv6 («::ffff:192.168.1.5»)
-        const remote = (req.socket.remoteAddress ?? '').replace(/^::ffff:/, '')
-        this.onRequest?.(id, Buffer.concat(chunks).toString('utf8'), remote)
+        this.onRequest?.(id, body, remote)
       })
     })
     server.maxConnections = MAX_CONNECTIONS

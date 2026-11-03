@@ -57,6 +57,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
+import org.json.JSONObject;
 
 /**
  * Biblioteca de Mitzi en Android: carpetas elegidas con el selector del sistema (sin
@@ -696,12 +697,25 @@ public class MitziLibraryPlugin extends Plugin {
             }
             String headers = head.toString("US-ASCII");
             int length = -1;
+            String type = "";
             for (String line : headers.split("\r\n")) {
-                if (line.toLowerCase(Locale.ROOT).startsWith("content-length:")) length = Integer.parseInt(line.substring(15).trim());
+                String lower = line.toLowerCase(Locale.ROOT);
+                if (lower.startsWith("content-length:")) length = Integer.parseInt(line.substring(15).trim());
+                if (lower.startsWith("content-type:")) type = lower.substring(13).trim();
             }
             OutputStream out = socket.getOutputStream();
             if (!headers.startsWith("POST /mitzi-sync ") || length <= 0 || length > MAX_SYNC_BODY) {
                 out.write("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                return;
+            }
+            String remote = socket.getInetAddress().getHostAddress();
+            if (isBlocked(remote)) {
+                out.write("HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                return;
+            }
+            if (!type.startsWith("application/json")) {
+                strike(remote);
+                out.write("HTTP/1.1 415 Unsupported Media Type\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 return;
             }
             byte[] body = new byte[length];
@@ -711,13 +725,21 @@ public class MitziLibraryPlugin extends Plugin {
                 if (n < 0) return;
                 read += n;
             }
+            String text = new String(body, StandardCharsets.UTF_8);
+            // lo que no tenga la forma de un sobre ni siquiera llega a la página
+            int version = envelopeVersion(text);
+            if (version == 0) {
+                strike(remote);
+                out.write("HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+                return;
+            }
             String id = UUID.randomUUID().toString();
             PendingSync pending = new PendingSync();
             pendingSync.put(id, pending);
             JSObject event = new JSObject();
             event.put("id", id);
-            event.put("body", new String(body, StandardCharsets.UTF_8));
-            event.put("remote", socket.getInetAddress().getHostAddress());
+            event.put("body", text);
+            event.put("remote", remote);
             notifyListeners("syncIncoming", event);
             boolean answered = pending.done.await(60, TimeUnit.SECONDS);
             pendingSync.remove(id);
@@ -727,11 +749,59 @@ public class MitziLibraryPlugin extends Plugin {
                 out.write(top.getBytes(StandardCharsets.US_ASCII));
                 out.write(reply);
             } else {
+                // solo cuenta un código de vincular equivocado: una llave de vínculo es imposible de
+                // adivinar, y casi siempre es un equipo desvinculado que sigue intentando
+                if (version == 1) strike(remote);
                 out.write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
             }
             out.flush();
         } catch (Exception ignored) {
             // el otro se fue a mitad: no pasa nada
+        }
+    }
+
+    /** Pedidos rechazados desde una misma dirección antes de bloquearla un rato (igual que electron/sync.ts). */
+    private static final int STRIKES = 10;
+    private static final long STRIKE_WINDOW_MS = 10 * 60_000L;
+    private static final long BLOCK_MS = 10 * 60_000L;
+    /** por dirección: { rechazos, desde cuándo, bloqueada hasta } */
+    private final Map<String, long[]> strikes = new ConcurrentHashMap<>();
+
+    private boolean isBlocked(String remote) {
+        long[] s = strikes.get(remote);
+        return s != null && s[2] > System.currentTimeMillis();
+    }
+
+    private synchronized void strike(String remote) {
+        long now = System.currentTimeMillis();
+        long[] s = strikes.get(remote);
+        if (s == null || now - s[1] > STRIKE_WINDOW_MS) s = new long[] { 0, now, 0 };
+        if (++s[0] >= STRIKES) s[2] = now + BLOCK_MS;
+        strikes.put(remote, s);
+        // que la lista no crezca sin fin si alguien prueba desde muchas direcciones
+        if (strikes.size() > 500) strikes.entrySet().removeIf(e -> now - e.getValue()[1] > STRIKE_WINDOW_MS && e.getValue()[2] < now);
+    }
+
+    /** La versión del sobre (1 o 2), o 0 si no tiene la forma de uno (la misma revisión que en la PC). */
+    private static int envelopeVersion(String text) {
+        try {
+            JSONObject e = new JSONObject(text);
+            java.util.Iterator<String> keys = e.keys();
+            while (keys.hasNext()) {
+                String k = keys.next();
+                if (!k.equals("v") && !k.equals("iv") && !k.equals("data") && !k.equals("from")) return 0;
+            }
+            Object v = e.opt("v");
+            if (!(v instanceof Integer) || ((Integer) v != 1 && (Integer) v != 2)) return 0;
+            Object iv = e.opt("iv");
+            Object data = e.opt("data");
+            if (!(iv instanceof String) || !((String) iv).matches("[A-Za-z0-9+/]{16}")) return 0;
+            if (!(data instanceof String) || !((String) data).matches("[A-Za-z0-9+/]+={0,2}")) return 0;
+            Object from = e.opt("from");
+            boolean ok = (Integer) v == 2 ? from instanceof String && ((String) from).matches("[0-9a-fA-F-]{36}") : from == null;
+            return ok ? (Integer) v : 0;
+        } catch (Exception ex) {
+            return 0;
         }
     }
 
@@ -813,8 +883,28 @@ public class MitziLibraryPlugin extends Plugin {
 
     // ---------- actualizaciones ----------
 
-    /** Solo se descargan archivos de las versiones publicadas de este repositorio. */
-    private static final String RELEASES = "https://github.com/luisnajm26-creator/mitzi/releases/download/";
+    /**
+     * Solo se descargan archivos de las versiones publicadas de este repositorio. Antes se comparaba
+     * el texto con startsWith, y una dirección con «..» (o «%2e%2e») empezaba bien pero, al
+     * resolverse, podía salir del repositorio. Ahora la ruta tiene que ser exactamente
+     * /luisnajm26-creator/mitzi/releases/download/v1.2.3/<archivo> (igual que electron/release.ts).
+     */
+    private static final java.util.regex.Pattern RELEASE_PATH =
+        java.util.regex.Pattern.compile("^/luisnajm26-creator/mitzi/releases/download/v[0-9]+\\.[0-9]+\\.[0-9]+/([A-Za-z0-9._-]+)$");
+
+    private static boolean isReleaseFile(String text, String fileName) {
+        // nada de segmentos «..» ni barras o puntos escondidos, ni siquiera codificados
+        if (java.util.regex.Pattern.compile("(^|[/\\\\])\\.\\.([/\\\\]|$)|%2e|%2f|%5c", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(text).find()) return false;
+        try {
+            java.net.URI uri = new java.net.URI(text);
+            if (!"https".equals(uri.getScheme()) || !"github.com".equals(uri.getHost()) || uri.getPort() != -1) return false;
+            if (uri.getRawUserInfo() != null || uri.getRawQuery() != null || uri.getRawFragment() != null) return false;
+            java.util.regex.Matcher m = RELEASE_PATH.matcher(uri.getRawPath() == null ? "" : uri.getRawPath());
+            return m.matches() && m.group(1).equals(fileName);
+        } catch (Exception e) {
+            return false;
+        }
+    }
 
     /**
      * Descarga el APK de una versión nueva, comprueba su huella SHA-256 contra el
@@ -826,7 +916,7 @@ public class MitziLibraryPlugin extends Plugin {
         String url = call.getString("url", "");
         String sumsUrl = call.getString("sumsUrl", "");
         String name = call.getString("name", "");
-        if (!url.startsWith(RELEASES) || !sumsUrl.startsWith(RELEASES) || !name.matches("Mitzi-[0-9]+\\.[0-9]+\\.[0-9]+\\.apk")) {
+        if (!name.matches("Mitzi-[0-9]+\\.[0-9]+\\.[0-9]+\\.apk") || !isReleaseFile(url, name) || !isReleaseFile(sumsUrl, "SHA256SUMS.txt")) {
             call.reject("Dirección de actualización no permitida");
             return;
         }

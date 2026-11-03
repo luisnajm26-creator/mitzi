@@ -7,7 +7,8 @@ import { installUpdate } from './updater.js'
 import os from 'node:os'
 import { discover, SyncServer, syncRequest } from './sync.js'
 import type { UpdateInfo } from '../shared/native-api.js'
-import { CSP } from '../shared/csp.js'
+import { CSP_HEADER } from '../shared/csp.js'
+import { appFile } from './serve.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.join(here, '..', '..')
@@ -169,13 +170,13 @@ function registerIpc() {
 
 function serveApp() {
   protocol.handle('mitzi', async request => {
-    const { pathname } = new URL(request.url)
-    const file = path.normalize(path.join(distDir, decodeURIComponent(pathname)))
-    if (!file.startsWith(distDir)) return new Response('Not found', { status: 404 })
+    const file = appFile(distDir, new URL(request.url).pathname)
+    // nosniff en todas: el navegador no adivina el tipo (un .txt no se ejecuta como script)
+    if (!file) return new Response('Not found', { status: 404, headers: { 'X-Content-Type-Options': 'nosniff' } })
     const response = await net.fetch(pathToFileURL(file).toString())
-    if (!file.endsWith('.html')) return response
     const headers = new Headers(response.headers)
-    headers.set('Content-Security-Policy', CSP)
+    headers.set('X-Content-Type-Options', 'nosniff')
+    if (file.endsWith('.html')) headers.set('Content-Security-Policy', CSP_HEADER)
     return new Response(response.body, { status: response.status, headers })
   })
 }

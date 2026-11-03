@@ -24,3 +24,10 @@ export const CSP = [
   "object-src 'none'",
   "base-uri 'self'",
 ].join('; ')
+
+/**
+ * Para el encabezado de la PC: además, nadie puede meter la app dentro de un marco (protección
+ * contra clickjacking). Va aparte porque en un <meta> el navegador la ignora y avisa en la
+ * consola. Los capítulos del EPUB y las copias de la hoja que gira no se ven afectados.
+ */
+export const CSP_HEADER = `${CSP}; frame-ancestors 'none'`

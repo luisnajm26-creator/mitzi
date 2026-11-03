@@ -5,9 +5,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { UpdateInfo } from '../shared/native-api.js'
+import { isReleaseFile } from './release.js'
 
-/** Solo se descargan archivos de las versiones publicadas de este repositorio. */
-const ALLOWED = 'https://github.com/luisnajm26-creator/mitzi/releases/download/'
 
 /**
  * Descarga el instalador nuevo, comprueba su huella SHA-256 contra el SHA256SUMS.txt
@@ -15,7 +14,8 @@ const ALLOWED = 'https://github.com/luisnajm26-creator/mitzi/releases/download/'
  */
 export async function installUpdate(info: UpdateInfo, onProgress: (fraction: number) => void): Promise<'installing'> {
   if (!app.isPackaged) throw new Error('Las actualizaciones solo se instalan en la app instalada, no en desarrollo.')
-  if (!info.url.startsWith(ALLOWED) || !info.sumsUrl.startsWith(ALLOWED) || !/^Mitzi-Setup-\d+\.\d+\.\d+\.exe$/.test(info.name))
+  // solo archivos de las versiones publicadas de este repositorio
+  if (!/^Mitzi-Setup-\d+\.\d+\.\d+\.exe$/.test(info.name) || !isReleaseFile(info.url, info.name) || !isReleaseFile(info.sumsUrl, 'SHA256SUMS.txt'))
     throw new Error('Dirección de actualización no permitida.')
 
   const sums = await (await net.fetch(info.sumsUrl)).text()
