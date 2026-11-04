@@ -6,7 +6,7 @@
 
 **Tu biblioteca, como el selector de un videojuego. Tus libros, como en papel.**
 
-Lector de libros electrónicos y cómics para **Android** y **Windows**. Gratis, sin anuncios, sin cuentas y de código abierto.
+Lector de libros electrónicos y cómics para **Android**, **Windows** y **Ubuntu**. Gratis, sin anuncios, sin cuentas y de código abierto.
 
 [![Última versión](https://img.shields.io/github/v/release/luisnajm26-creator/mitzi?style=flat-square&label=versi%C3%B3n&color=c9b6ff&labelColor=15111f)](https://github.com/luisnajm26-creator/mitzi/releases/latest)
 [![Descargas](https://img.shields.io/github/downloads/luisnajm26-creator/mitzi/total?style=flat-square&label=descargas&color=c9b6ff&labelColor=15111f)](https://github.com/luisnajm26-creator/mitzi/releases)
@@ -96,6 +96,7 @@ Seleccionas un fragmento y Mitzi lo convierte en una tarjeta para tus historias 
 2. Elige tu archivo:
    - **Android:** `Mitzi-x.y.z.apk`. Al abrirlo, el teléfono te pedirá permiso para instalar apps de esta fuente.
    - **Windows:** `Mitzi-Setup-x.y.z.exe`. Windows puede avisar «Windows protegió tu PC» porque el instalador no tiene certificado de firma: *Más información* › *Ejecutar de todos modos*.
+   - **Ubuntu:** `Mitzi-x.y.z.deb`. Se instala con `sudo apt install ./Mitzi-x.y.z.deb`; los libros van en `~/Documentos/Mitzi Libros`.
 3. Abre Mitzi, elige la carpeta donde guardas tus libros y listo.
 
 Mitzi revisa una vez al día si hay una versión nueva y la instala comprobando su huella SHA-256 (`SHA256SUMS.txt`). Descárgala solo desde este repositorio.
