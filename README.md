@@ -11,10 +11,11 @@ Lector de libros electrónicos y cómics para **Android**, **Windows** y **Ubunt
 [![Última versión](https://img.shields.io/github/v/release/luisnajm26-creator/mitzi?style=flat-square&label=versi%C3%B3n&color=c9b6ff&labelColor=15111f)](https://github.com/luisnajm26-creator/mitzi/releases/latest)
 [![Descargas](https://img.shields.io/github/downloads/luisnajm26-creator/mitzi/total?style=flat-square&label=descargas&color=c9b6ff&labelColor=15111f)](https://github.com/luisnajm26-creator/mitzi/releases)
 [![Licencia MIT](https://img.shields.io/badge/licencia-MIT-c9b6ff?style=flat-square&labelColor=15111f)](LICENSE)
-[![Android y Windows](https://img.shields.io/badge/Android%20%C2%B7%20Windows-sin%20Google-c9b6ff?style=flat-square&labelColor=15111f)](#descargar)
+[![Android, Windows y Ubuntu](https://img.shields.io/badge/Android%20%C2%B7%20Windows%20%C2%B7%20Ubuntu-sin%20Google-c9b6ff?style=flat-square&labelColor=15111f)](#descargar)
 
 <a href="https://github.com/luisnajm26-creator/mitzi/releases/latest"><img src="https://img.shields.io/badge/Descargar_para-Android-3ddc84?style=for-the-badge&logo=android&logoColor=white&labelColor=15111f" alt="Descargar para Android" /></a>
 <a href="https://github.com/luisnajm26-creator/mitzi/releases/latest"><img src="https://img.shields.io/badge/Descargar_para-Windows-4cc2ff?style=for-the-badge&logo=windows11&logoColor=white&labelColor=15111f" alt="Descargar para Windows" /></a>
+<a href="https://github.com/luisnajm26-creator/mitzi/releases/latest"><img src="https://img.shields.io/badge/Descargar_para-Ubuntu-e95420?style=for-the-badge&logo=ubuntu&logoColor=white&labelColor=15111f" alt="Descargar para Ubuntu" /></a>
 
 <br />
 
@@ -135,6 +136,7 @@ npm run electron:dev  # app de PC
 | `npm run android` | APK de prueba («Mitzi Prueba», se instala junto a la oficial); necesita Java 21 y el Android SDK |
 | `npm run typecheck` | Revisa los tipos de TypeScript |
 | `npm run instalador` | Crea el instalador de Windows en `release/` |
+| `npm run linux` | Crea el paquete `.deb` de Ubuntu (solo en Linux; al publicar lo arma GitHub Actions) |
 | `npm run llave` | Crea la llave para firmar el APK (una sola vez; se guarda en `~/.mitzi`, fuera del repositorio) |
 | `npm run publicar` | Arma una versión (instalador, APK firmado y `SHA256SUMS.txt`); con `-- --subir` la publica en GitHub |
 | `npx electron scripts/capturas.mjs` | Rehace las capturas de este README (con `npm run dev` abierto) |
@@ -196,7 +198,7 @@ Hola, soy **Luis A.** Hice Mitzi por puro gusto personal, a raíz de mi afición
 
 <br />
 
-**Mitzi** is a free, open-source e-book and comic reader for Android and Windows. Your library is shown like a game-console carousel: the selected book spins under a spotlight and the background takes the colors of its cover. On wide screens the book opens into two pages with a paper sheet that turns. It reads EPUB, PDF, MOBI/AZW3, FB2 and CBZ, offers pastel and dark themes with auto-contrast text, highlights and notes, collections, reading stats, read-aloud, quote cards for social media, account-free phone↔PC sync over Wi-Fi (scan a QR code; encrypted, no cloud), and updates itself from this repository's Releases. It works on phones without Google services.
+**Mitzi** is a free, open-source e-book and comic reader for Android, Windows and Ubuntu. Your library is shown like a game-console carousel: the selected book spins under a spotlight and the background takes the colors of its cover. On wide screens the book opens into two pages with a paper sheet that turns. It reads EPUB, PDF, MOBI/AZW3, FB2 and CBZ, offers pastel and dark themes with auto-contrast text, highlights and notes, collections, reading stats, read-aloud, quote cards for social media, account-free phone↔PC sync over Wi-Fi (scan a QR code; encrypted, no cloud), and updates itself from this repository's Releases. It works on phones without Google services.
 
 **Mitzi ships with no books**: you add your own files. Built with the help of Claude (AI): the idea, design and device testing are the author's. Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
