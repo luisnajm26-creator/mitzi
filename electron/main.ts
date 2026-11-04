@@ -24,8 +24,12 @@ if (linux) app.commandLine.appendSwitch('enable-speech-dispatcher')
 // En Wayland, Chromium avisa que su modo nativo no es compatible con Vulkan y la biblioteca 3D
 // se ve mal (bordes dentados, portadas borrosas). Con X11 (XWayland) se ve bien. Quien quiera
 // otro modo puede pasar --ozone-platform=... al abrir Mitzi.
-if (linux && !process.argv.some(arg => arg.startsWith('--ozone-platform'))) {
-  app.commandLine.appendSwitch('ozone-platform', 'x11')
+// Chromium elige el modo gráfico antes de que corra este código: un appendSwitch aquí llega tarde
+// (la ventana queda en Wayland y la GPU en X11, y el proceso de GPU se cae). Por eso Mitzi se
+// vuelve a abrir una sola vez con la opción en la línea de comandos; con ella ya no entra aquí.
+if (linux && process.env.XDG_SESSION_TYPE === 'wayland' && !process.argv.some(arg => arg.startsWith('--ozone-platform'))) {
+  app.relaunch({ args: [...process.argv.slice(1), '--ozone-platform=x11'] })
+  app.exit(0)
 }
 
 protocol.registerSchemesAsPrivileged([
