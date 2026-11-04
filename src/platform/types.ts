@@ -11,6 +11,8 @@ export interface ScanResult {
 /** Lo que cada plataforma (PC, Android, navegador) sabe hacer por la app. */
 export interface Platform {
   kind: 'electron' | 'web' | 'android'
+  /** En la PC, el sistema: 'win32' (Windows) o 'linux' (Ubuntu). */
+  os?: string
   /** Si se pueden agregar o quitar carpetas de libros desde la app. */
   canManageFolders: boolean
   getFolders(): Promise<LibraryFolders>

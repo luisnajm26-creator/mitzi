@@ -14,7 +14,12 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.join(here, '..', '..')
 const distDir = path.join(appRoot, 'dist')
 const devServerUrl = process.env.VITE_DEV_SERVER_URL
+const linux = process.platform === 'linux'
+const iconPath = path.join(appRoot, 'resources', 'icon.png')
 
+// En Linux, Chromium solo usa las voces del sistema (speech-dispatcher, que Ubuntu trae) si se
+// le pide; sin esto, la lectura en voz alta no encuentra ninguna voz.
+if (linux) app.commandLine.appendSwitch('enable-speech-dispatcher')
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'mitzi', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
@@ -40,7 +45,9 @@ function showWindow() {
 function setTray(on: boolean) {
   keepInTray = on
   if (on && !tray) {
-    const icon = nativeImage.createFromPath(path.join(appRoot, 'resources', 'icon.png')).resize({ width: 16, height: 16 })
+    // Windows dibuja el ícono de la bandeja a 16 px; la barra de Ubuntu, a unos 22-24 px
+    const size = linux ? 24 : 16
+    const icon = nativeImage.createFromPath(iconPath).resize({ width: size, height: size })
     tray = new Tray(icon)
     tray.setToolTip('Mitzi')
     tray.setContextMenu(
@@ -56,6 +63,7 @@ function setTray(on: boolean) {
         },
       ]),
     )
+    // en Ubuntu la bandeja no avisa del clic (solo abre el menú): ahí se usa «Abrir Mitzi»
     tray.on('click', showWindow)
   }
   if (!on && tray) {
@@ -79,6 +87,8 @@ function createWindow() {
     title: 'Mitzi',
     backgroundColor: '#0d0b12',
     autoHideMenuBar: true,
+    // en Windows el ícono sale del .exe; en Linux la ventana lo necesita aparte
+    ...(linux ? { icon: iconPath } : {}),
     show: false,
     webPreferences: {
       preload: path.join(here, 'preload.cjs'),

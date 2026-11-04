@@ -19,6 +19,7 @@
     "android": "node scripts/android.mjs",
     "llave": "node scripts/crear-llave.mjs",
     "instalador": "npm run build && electron-builder --win --publish never",
+    "linux": "npm run build && electron-builder --linux --publish never",
     "publicar": "node scripts/publicar.mjs"
   },
   "dependencies": {
@@ -72,7 +73,6 @@
       "!node_modules/**/*"
     ],
     "asar": true,
-    "electronDist": "node_modules/electron/dist",
     "win": {
       "target": [
         {
@@ -92,6 +92,31 @@
       "shortcutName": "Mitzi",
       "artifactName": "Mitzi-Setup-${version}.exe",
       "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.png",
+      "category": "Office",
+      "maintainer": "Luis Angel Lopez <234489334+luisnajm26-creator@users.noreply.github.com>",
+      "synopsis": "Lector de EPUB y PDF",
+      "description": "Lector de EPUB y PDF de código abierto, con biblioteca 3D, libro abierto y hoja que gira al pasar página.",
+      "desktop": {
+        "entry": {
+          "Name": "Mitzi",
+          "Comment": "Lector de EPUB y PDF",
+          "Keywords": "libros;epub;pdf;lector;ebook;"
+        }
+      }
+    },
+    "deb": {
+      "artifactName": "Mitzi-${version}.deb"
     },
     "publish": null
   }

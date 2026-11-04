@@ -64,7 +64,13 @@ export async function checkForUpdate(force = false): Promise<UpdateInfo | null> 
     useUpdates.setState({ info: null })
     return null
   }
-  const pattern = platform.kind === 'android' ? /^Mitzi-\d+\.\d+\.\d+\.apk$/ : /^Mitzi-Setup-\d+\.\d+\.\d+\.exe$/
+  // el archivo de cada sistema: APK en Android, paquete .deb en Ubuntu, instalador en Windows
+  const pattern =
+    platform.kind === 'android'
+      ? /^Mitzi-\d+\.\d+\.\d+\.apk$/
+      : platform.os === 'linux'
+        ? /^Mitzi-\d+\.\d+\.\d+\.deb$/
+        : /^Mitzi-Setup-\d+\.\d+\.\d+\.exe$/
   const asset = release.assets?.find(a => pattern.test(a.name))
   const sums = release.assets?.find(a => a.name === 'SHA256SUMS.txt')
   if (!asset || !sums) return null

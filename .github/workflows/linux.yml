@@ -1,0 +1,93 @@
+# Mitzi para Ubuntu: el paquete .deb solo se puede armar en Linux (necesita fpm), así que lo
+# arma GitHub en una máquina con Ubuntu 24.04.
+#
+# - Al subir cambios del código de la PC: lo arma, lo instala como lo haría un usuario y abre
+#   Mitzi con una pantalla virtual para comprobar que arranca (deja una captura).
+# - Al publicar una versión (npm run publicar -- --subir): además sube Mitzi-x.y.z.deb a esa
+#   versión y agrega su huella a SHA256SUMS.txt, que la app comprueba antes de actualizarse.
+# - A mano (Actions › Linux › Run workflow): con una etiqueta (v0.4.0) hace lo mismo para una
+#   versión que ya existe.
+name: Linux
+
+on:
+  push:
+    # solo ramas: las etiquetas de las versiones las atiende `release`
+    branches: ['**']
+    paths:
+      - 'electron/**'
+      - 'shared/**'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/linux.yml'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Versión publicada a la que se agrega el .deb (por ejemplo v0.4.0). Vacío: solo armar y probar'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  deb:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # foliate-js es un submódulo
+          submodules: true
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Armar el paquete
+        run: npm run linux
+
+      - name: Instalarlo y abrir Mitzi
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb imagemagick
+          # como un usuario: apt resuelve las dependencias y el paquete instala su perfil de AppArmor
+          sudo apt-get install -y ./release/Mitzi-*.deb
+          # sin tarjeta de video, la biblioteca 3D necesita el WebGL por software
+          xvfb-run -a -s "-screen 0 1280x820x24" bash -c '
+            mitzi --user-data-dir="$RUNNER_TEMP/datos" --enable-unsafe-swiftshader > mitzi.log 2>&1 &
+            pid=$!
+            sleep 25
+            import -window root captura-ubuntu.png
+            kill -0 $pid || { echo "Mitzi se cerró sola"; cat mitzi.log; exit 1; }
+            kill $pid
+          '
+          cat mitzi.log
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mitzi-ubuntu
+          path: |
+            release/Mitzi-*.deb
+            captura-ubuntu.png
+            mitzi.log
+
+      - name: Subirlo a la versión publicada
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deb=$(cd release && ls Mitzi-*.deb)
+          # el paquete tiene que ser de la misma versión que la etiqueta
+          [ "$deb" = "Mitzi-${TAG#v}.deb" ] || { echo "El paquete $deb no es de la versión $TAG"; exit 1; }
+          gh release download "$TAG" -p SHA256SUMS.txt -D huellas
+          # se cambia (o se agrega) solo la línea del .deb; las del .exe y el .apk quedan igual
+          { grep -v "  $deb\$" huellas/SHA256SUMS.txt || true; (cd release && sha256sum "$deb"); } > release/SHA256SUMS.txt
+          cat release/SHA256SUMS.txt
+          gh release upload "$TAG" "release/$deb" release/SHA256SUMS.txt --clobber

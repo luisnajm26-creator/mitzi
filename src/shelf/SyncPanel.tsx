@@ -222,7 +222,7 @@ function LinkCard() {
           </div>
           <p className="sync-hint">
             Solo se escanea una vez por equipo y el código deja de servir a los 10 minutos.
-            {platform.kind === 'electron' &&
+            {platform.os === 'win32' &&
               ' Si Windows pregunta, permite que Mitzi use las redes privadas; si tu Wi-Fi está como «red pública» en Windows, los otros equipos no podrán conectarse.'}
           </p>
           <button className="ghost-button small" onClick={endPairing}>

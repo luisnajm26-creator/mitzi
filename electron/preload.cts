@@ -10,6 +10,7 @@ const listen = <T extends unknown[]>(channel: string, cb: (...args: T) => void) 
 }
 
 const api: MitziNativeApi = {
+  os: process.platform,
   getFolders: () => ipcRenderer.invoke('library:get-folders'),
   addFolder: () => ipcRenderer.invoke('library:add-folder'),
   removeFolder: folder => ipcRenderer.invoke('library:remove-folder', folder),

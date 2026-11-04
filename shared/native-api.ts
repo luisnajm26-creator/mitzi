@@ -16,7 +16,7 @@ export interface LibraryFolders {
 /** Una versión nueva publicada en GitHub Releases. */
 export interface UpdateInfo {
   version: string
-  /** nombre del archivo (Mitzi-Setup-x.y.z.exe o Mitzi-x.y.z.apk) */
+  /** nombre del archivo (Mitzi-Setup-x.y.z.exe, Mitzi-x.y.z.deb o Mitzi-x.y.z.apk) */
   name: string
   url: string
   /** SHA256SUMS.txt de la misma versión: la huella que debe tener la descarga */
@@ -27,6 +27,8 @@ export interface UpdateInfo {
 
 /** Puente que el preload de Electron expone como `window.mitziNative`. */
 export interface MitziNativeApi {
+  /** El sistema de la PC: 'win32' (Windows) o 'linux' (Ubuntu). */
+  os: string
   getFolders(): Promise<LibraryFolders>
   addFolder(): Promise<boolean>
   removeFolder(folder: string): Promise<void>

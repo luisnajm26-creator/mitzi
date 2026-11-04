@@ -8,6 +8,7 @@ export function createElectronPlatform(api: MitziNativeApi): Platform {
   let offSync: (() => void) | null = null
   return {
     kind: 'electron',
+    os: api.os,
     canManageFolders: true,
     getFolders: () => api.getFolders(),
     addFolder: () => api.addFolder(),
