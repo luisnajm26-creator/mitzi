@@ -37,13 +37,13 @@ jobs:
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # foliate-js es un submódulo
           submodules: true
           ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -70,7 +70,7 @@ jobs:
           '
           cat mitzi.log
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: mitzi-ubuntu
           path: |

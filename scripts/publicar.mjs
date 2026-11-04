@@ -41,7 +41,9 @@ const notesArg = fs.existsSync(notes) ? `--notes-file "${path.relative(root, not
 const command = `gh release create v${v} ${assets} --title "Mitzi ${v}" ${notesArg}`
 if (process.argv.includes('--subir')) {
   run(command)
-  console.log('\nPublicada. Las apps instaladas la verán al abrirse.\n')
+  console.log('\nPublicada. Las apps instaladas la verán al abrirse.')
+  // el .deb de Ubuntu no se puede armar en Windows: lo arma y lo sube GitHub Actions
+  console.log('GitHub Actions agrega Mitzi-' + v + '.deb y su huella en unos minutos (pestaña Actions › Linux).\n')
 } else {
   console.log(`Para publicarla (queda pública en GitHub):\n  npm run publicar -- --subir\no a mano:\n  ${command}\n`)
 }
