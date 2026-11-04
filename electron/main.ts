@@ -21,6 +21,13 @@ const iconPath = path.join(appRoot, 'resources', 'icon.png')
 // le pide; sin esto, la lectura en voz alta no encuentra ninguna voz.
 if (linux) app.commandLine.appendSwitch('enable-speech-dispatcher')
 
+// En Wayland, Chromium avisa que su modo nativo no es compatible con Vulkan y la biblioteca 3D
+// se ve mal (bordes dentados, portadas borrosas). Con X11 (XWayland) se ve bien. Quien quiera
+// otro modo puede pasar --ozone-platform=... al abrir Mitzi.
+if (linux && !process.argv.some(arg => arg.startsWith('--ozone-platform'))) {
+  app.commandLine.appendSwitch('ozone-platform', 'x11')
+}
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'mitzi', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, codeCache: true } },
 ])
